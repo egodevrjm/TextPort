@@ -27,7 +27,7 @@ struct TextPortApp: App {
                 Button("Open Quickly...") {
                     document.showQuickOpen()
                 }
-                .keyboardShortcut("p", modifiers: .command)
+                .keyboardShortcut("o", modifiers: [.command, .shift])
 
                 Menu("Open Recent") {
                     if document.recentFiles.isEmpty {
@@ -78,6 +78,18 @@ struct TextPortApp: App {
                     document.showingExportSheet = true
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+
+                Button("Export PDF...") {
+                    document.exportPDF()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+            }
+
+            CommandGroup(replacing: .printItem) {
+                Button("Print...") {
+                    document.printDocument()
+                }
+                .keyboardShortcut("p", modifiers: .command)
             }
 
             CommandGroup(after: .textEditing) {
@@ -143,6 +155,16 @@ struct TextPortApp: App {
             }
 
             CommandMenu("Text") {
+                Menu("Syntax Highlighting") {
+                    ForEach(SyntaxHighlightMode.allCases, id: \.self) { mode in
+                        Button(mode.label) {
+                            document.setActiveSyntaxMode(mode)
+                        }
+                    }
+                }
+
+                Divider()
+
                 Button("Trim Trailing Whitespace") {
                     document.trimTrailingWhitespace()
                 }
@@ -217,6 +239,20 @@ struct TextPortApp: App {
             CommandMenu("View") {
                 Toggle("Show Line Numbers", isOn: $preferences.showLineNumbers)
                 Toggle("Word Wrap", isOn: $preferences.wordWrap)
+
+                Divider()
+
+                Button("Toggle Split View") {
+                    document.toggleSplitView()
+                }
+                .keyboardShortcut("\\", modifiers: .command)
+            }
+
+            CommandMenu("Tools") {
+                Button("Document Stats") {
+                    document.showDocumentStats()
+                }
+                .keyboardShortcut("i", modifiers: [.command, .option])
             }
         }
 

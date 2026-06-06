@@ -16,10 +16,14 @@ final class TextDocumentStore: ObservableObject {
     @Published var quickOpenQuery = ""
     @Published var recentFiles: [URL]
     @Published var externalChangePrompt: ExternalFileChange?
+    @Published var splitViewEnabled = false
+    @Published var secondaryTabID: UUID?
+    @Published var showingDocumentStats = false
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
     private var fileChangeTimer: Timer?
+    private var selectedTextByTabID: [UUID: String] = [:]
 
     init() {
         recentFiles = RecentFileStore.load()
@@ -50,6 +54,11 @@ final class TextDocumentStore: ObservableObject {
         activeTab.text
     }
 
+    var secondaryTab: TextDocumentTab? {
+        guard let secondaryTabID else { return nil }
+        return tabs.first { $0.id == secondaryTabID }
+    }
+
     var windowTitle: String {
         "\(activeTab.isEdited ? "*" : "")\(activeTab.fileDisplayName)"
     }
@@ -73,6 +82,10 @@ final class TextDocumentStore: ObservableObject {
 
     var characterCountText: String {
         "\(activeTab.text.count) characters"
+    }
+
+    var activeDocumentStats: DocumentStats {
+        stats(for: selectedTabID)
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -108,14 +121,36 @@ final class TextDocumentStore: ObservableObject {
     }
 
     func updateActiveText(_ newText: String) {
-        guard tabs[activeTabIndex].text != newText else { return }
+        updateText(for: selectedTabID, newText)
+    }
 
-        mutateActiveTab { tab in
+    func text(for id: UUID) -> String {
+        tabs.first(where: { $0.id == id })?.text ?? ""
+    }
+
+    func updateText(for id: UUID, _ newText: String) {
+        guard let index = tabs.firstIndex(where: { $0.id == id }), tabs[index].text != newText else { return }
+
+        mutateTab(id) { tab in
             tab.text = newText
             tab.isEdited = true
             tab.preferredLineEnding = TextLineEnding.detect(in: newText, fallback: tab.preferredLineEnding)
         }
         statusText = "Edited"
+    }
+
+    func updateSelectedText(for id: UUID, selectedText: String) {
+        selectedTextByTabID[id] = selectedText
+    }
+
+    func effectiveSyntaxMode(for id: UUID) -> SyntaxHighlightMode {
+        guard let tab = tabs.first(where: { $0.id == id }) else { return .plainText }
+
+        if tab.syntaxMode != .automatic {
+            return tab.syntaxMode
+        }
+
+        return SyntaxHighlightMode.detect(fileName: tab.fileDisplayName, text: tab.text)
     }
 
     func updateActiveDisplayName(_ displayName: String) {
@@ -153,6 +188,41 @@ final class TextDocumentStore: ObservableObject {
         titleEditRequestID = UUID()
     }
 
+    func setActiveSyntaxMode(_ mode: SyntaxHighlightMode) {
+        mutateActiveTab { tab in
+            tab.syntaxMode = mode
+        }
+        statusText = "Syntax mode set to \(mode.label)"
+    }
+
+    func toggleSplitView() {
+        if splitViewEnabled {
+            splitViewEnabled = false
+            secondaryTabID = nil
+            statusText = "Closed split view"
+            return
+        }
+
+        if tabs.count == 1 {
+            let tab = makeBlankTab()
+            tabs.append(tab)
+            secondaryTabID = tab.id
+        } else {
+            secondaryTabID = tabs.first(where: { $0.id != selectedTabID })?.id
+        }
+
+        splitViewEnabled = secondaryTabID != nil
+        statusText = splitViewEnabled ? "Opened split view" : "Split view unavailable"
+        scheduleSessionSave()
+    }
+
+    func setSecondaryTab(_ id: UUID) {
+        guard tabs.contains(where: { $0.id == id }) else { return }
+        secondaryTabID = id
+        splitViewEnabled = true
+        scheduleSessionSave()
+    }
+
     func newDocument() {
         let tab = makeBlankTab()
         tabs.append(tab)
@@ -170,6 +240,7 @@ final class TextDocumentStore: ObservableObject {
         guard confirmCloseTab(at: index) else { return }
 
         let closingSelectedTab = selectedTabID == id
+        let closingSecondaryTab = secondaryTabID == id
         tabs.remove(at: index)
 
         if tabs.isEmpty {
@@ -184,6 +255,11 @@ final class TextDocumentStore: ObservableObject {
         if closingSelectedTab {
             let nextIndex = min(index, tabs.count - 1)
             selectedTabID = tabs[nextIndex].id
+        }
+
+        if closingSecondaryTab {
+            secondaryTabID = tabs.first(where: { $0.id != selectedTabID })?.id
+            splitViewEnabled = secondaryTabID != nil
         }
 
         statusText = "Closed tab"
@@ -361,6 +437,25 @@ final class TextDocumentStore: ObservableObject {
         }
     }
 
+    func showDocumentStats() {
+        showingDocumentStats = true
+    }
+
+    func exportPDF() {
+        guard let url = chooseSaveURL(defaultExtension: "pdf", title: "Export PDF", tab: activeTab) else { return }
+
+        do {
+            try PDFTextExporter.export(tab: activeTab, fontSize: preferences.fontSize, to: url)
+            statusText = "Exported \(url.lastPathComponent)"
+        } catch {
+            present(error, action: "export PDF")
+        }
+    }
+
+    func printDocument() {
+        PrintService.print(tab: activeTab, fontSize: preferences.fontSize)
+    }
+
     func saveDocumentAs() {
         let tab = activeTab
         guard let destination = chooseSaveURL(defaultExtension: defaultFileExtension(for: tab), title: "Save Text", tab: tab) else { return }
@@ -381,7 +476,8 @@ final class TextDocumentStore: ObservableObject {
     private func makeBlankTab() -> TextDocumentTab {
         TextDocumentTab(
             textEncoding: preferences.defaultEncoding,
-            preferredLineEnding: preferences.defaultLineEnding
+            preferredLineEnding: preferences.defaultLineEnding,
+            syntaxMode: .automatic
         )
     }
 
@@ -607,6 +703,12 @@ final class TextDocumentStore: ObservableObject {
         scheduleSessionSave()
     }
 
+    private func stats(for id: UUID) -> DocumentStats {
+        let tab = tabs.first(where: { $0.id == id }) ?? activeTab
+        let selectedText = selectedTextByTabID[id] ?? ""
+        return DocumentStats(tab: tab, selectedText: selectedText)
+    }
+
     private func scheduleSessionSave() {
         sessionSaveTask?.cancel()
         let tabsSnapshot = tabs
@@ -682,6 +784,7 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
     var preferredLineEnding: TextLineEnding
     var lastKnownModificationDate: Date?
     var lastExternalChangePromptDate: Date?
+    var syntaxMode: SyntaxHighlightMode
 
     init(
         id: UUID = UUID(),
@@ -692,7 +795,8 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         textEncoding: TextEncoding = .utf8,
         preferredLineEnding: TextLineEnding = .lf,
         lastKnownModificationDate: Date? = nil,
-        lastExternalChangePromptDate: Date? = nil
+        lastExternalChangePromptDate: Date? = nil,
+        syntaxMode: SyntaxHighlightMode = .automatic
     ) {
         self.id = id
         self.text = text
@@ -703,11 +807,67 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         self.preferredLineEnding = preferredLineEnding
         self.lastKnownModificationDate = lastKnownModificationDate
         self.lastExternalChangePromptDate = lastExternalChangePromptDate
+        self.syntaxMode = syntaxMode
     }
 
     var fileDisplayName: String {
         let trimmedName = displayName.trimmedFileName
         return trimmedName.isEmpty ? "Untitled" : trimmedName
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case text
+        case fileURL
+        case displayName
+        case isEdited
+        case textEncoding
+        case preferredLineEnding
+        case lastKnownModificationDate
+        case lastExternalChangePromptDate
+        case syntaxMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
+        fileURL = try container.decodeIfPresent(URL.self, forKey: .fileURL)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "Untitled"
+        isEdited = try container.decodeIfPresent(Bool.self, forKey: .isEdited) ?? false
+        textEncoding = try container.decodeIfPresent(TextEncoding.self, forKey: .textEncoding) ?? .utf8
+        preferredLineEnding = try container.decodeIfPresent(TextLineEnding.self, forKey: .preferredLineEnding) ?? .lf
+        lastKnownModificationDate = try container.decodeIfPresent(Date.self, forKey: .lastKnownModificationDate)
+        lastExternalChangePromptDate = try container.decodeIfPresent(Date.self, forKey: .lastExternalChangePromptDate)
+        syntaxMode = try container.decodeIfPresent(SyntaxHighlightMode.self, forKey: .syntaxMode) ?? .automatic
+    }
+}
+
+struct DocumentStats {
+    let fileName: String
+    let lines: Int
+    let words: Int
+    let characters: Int
+    let bytes: Int
+    let fileSize: Int?
+    let selectedLines: Int
+    let selectedWords: Int
+    let selectedCharacters: Int
+    let selectedBytes: Int
+
+    init(tab: TextDocumentTab, selectedText: String) {
+        fileName = tab.fileDisplayName
+        lines = TextMetrics.lineCount(in: tab.text)
+        words = TextMetrics.wordCount(in: tab.text)
+        characters = tab.text.count
+        bytes = TextFileWriter.encodedData(for: tab).map(\.count) ?? tab.text.utf8.count
+        fileSize = tab.fileURL.flatMap { url in
+            try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int
+        }
+        selectedLines = selectedText.isEmpty ? 0 : TextMetrics.lineCount(in: selectedText)
+        selectedWords = TextMetrics.wordCount(in: selectedText)
+        selectedCharacters = selectedText.count
+        selectedBytes = selectedText.data(using: tab.textEncoding.stringEncoding)?.count ?? selectedText.utf8.count
     }
 }
 
@@ -729,6 +889,68 @@ struct QuickOpenItem: Identifiable, Equatable {
 enum QuickOpenKind: Equatable {
     case openTab(UUID)
     case recentFile(URL)
+}
+
+enum SyntaxHighlightMode: String, CaseIterable, Codable {
+    case automatic
+    case plainText
+    case json
+    case markdown
+    case html
+    case css
+    case javascript
+    case swift
+    case python
+    case shell
+
+    var label: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .plainText: "Plain Text"
+        case .json: "JSON"
+        case .markdown: "Markdown"
+        case .html: "HTML"
+        case .css: "CSS"
+        case .javascript: "JavaScript"
+        case .swift: "Swift"
+        case .python: "Python"
+        case .shell: "Shell"
+        }
+    }
+
+    static func detect(fileName: String, text: String) -> SyntaxHighlightMode {
+        switch fileName.fileExtension.lowercased() {
+        case "json":
+            return .json
+        case "md", "markdown", "mdown":
+            return .markdown
+        case "html", "htm", "xml":
+            return .html
+        case "css":
+            return .css
+        case "js", "mjs", "cjs", "ts", "tsx", "jsx":
+            return .javascript
+        case "swift":
+            return .swift
+        case "py":
+            return .python
+        case "sh", "bash", "zsh", "command":
+            return .shell
+        default:
+            break
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.first == "{" || trimmed.first == "[" {
+            return .json
+        }
+
+        if trimmed.hasPrefix("#!") {
+            return .shell
+        }
+
+        return .plainText
+    }
 }
 
 struct ExternalFileChange: Identifiable {
@@ -911,6 +1133,10 @@ enum TextFileWriter {
         }
 
         return EncodedTextFile(data: utf8Data, encoding: .utf8, lineEnding: tab.preferredLineEnding)
+    }
+
+    static func encodedData(for tab: TextDocumentTab) -> Data? {
+        try? encodedFile(for: tab).data
     }
 }
 
@@ -1110,6 +1336,7 @@ enum TextSessionStore {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(session)
             try data.write(to: sessionURL, options: .atomic)
+            try TextDraftStore.saveDrafts(for: tabs, in: appSupportURL.appendingPathComponent("Drafts", isDirectory: true))
         } catch {
             // Session restore is helpful but should never interrupt editing.
         }
@@ -1123,6 +1350,26 @@ enum TextSessionStore {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return baseURL.appendingPathComponent("TextPort", isDirectory: true)
+    }
+}
+
+enum TextDraftStore {
+    static func saveDrafts(for tabs: [TextDocumentTab], in draftsURL: URL) throws {
+        try FileManager.default.createDirectory(at: draftsURL, withIntermediateDirectories: true)
+
+        let activeDraftIDs = Set(tabs.filter { $0.fileURL == nil || $0.isEdited }.map(\.id.uuidString))
+        let existingDrafts = (try? FileManager.default.contentsOfDirectory(at: draftsURL, includingPropertiesForKeys: nil)) ?? []
+
+        for draftURL in existingDrafts where draftURL.pathExtension == "txt" {
+            if !activeDraftIDs.contains(draftURL.deletingPathExtension().lastPathComponent) {
+                try? FileManager.default.removeItem(at: draftURL)
+            }
+        }
+
+        for tab in tabs where tab.fileURL == nil || tab.isEdited {
+            let draftURL = draftsURL.appendingPathComponent(tab.id.uuidString).appendingPathExtension("txt")
+            try tab.text.write(to: draftURL, atomically: true, encoding: .utf8)
+        }
     }
 }
 
@@ -1160,6 +1407,13 @@ enum TextMetrics {
         }
 
         return lineCount
+    }
+
+    static func wordCount(in text: String) -> Int {
+        let words = text.split { character in
+            character.isWhitespace || character.isPunctuation
+        }
+        return words.count
     }
 
     static func lineEndingDescription(in text: String) -> String {

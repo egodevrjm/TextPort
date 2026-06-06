@@ -3,13 +3,16 @@ import SwiftUI
 
 @MainActor
 struct PlainTextEditorView: NSViewRepresentable {
+    var tabID: UUID
     @Binding var text: String
     var fontSize: Double
     var showLineNumbers: Bool
     var wordWrap: Bool
+    var syntaxMode: SyntaxHighlightMode
+    var selectionChanged: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, selectionChanged: selectionChanged)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -42,7 +45,8 @@ struct PlainTextEditorView: NSViewRepresentable {
             scrollView: scrollView,
             fontSize: fontSize,
             showLineNumbers: showLineNumbers,
-            wordWrap: wordWrap
+            wordWrap: wordWrap,
+            syntaxMode: syntaxMode
         )
 
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -60,6 +64,7 @@ struct PlainTextEditorView: NSViewRepresentable {
         guard let textView = context.coordinator.textView else { return }
 
         context.coordinator.text = $text
+        context.coordinator.selectionChanged = selectionChanged
 
         if textView.string != text {
             textView.string = text
@@ -70,7 +75,8 @@ struct PlainTextEditorView: NSViewRepresentable {
             scrollView: scrollView,
             fontSize: fontSize,
             showLineNumbers: showLineNumbers,
-            wordWrap: wordWrap
+            wordWrap: wordWrap,
+            syntaxMode: syntaxMode
         )
     }
 
@@ -81,12 +87,16 @@ struct PlainTextEditorView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var selectionChanged: (String) -> Void
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
         private var lineNumberRuler: LineNumberRulerView?
+        private var isApplyingSyntax = false
+        private var currentSyntaxMode: SyntaxHighlightMode = .plainText
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, selectionChanged: @escaping (String) -> Void) {
             self.text = text
+            self.selectionChanged = selectionChanged
         }
 
         func configure(
@@ -94,18 +104,33 @@ struct PlainTextEditorView: NSViewRepresentable {
             scrollView: NSScrollView,
             fontSize: Double,
             showLineNumbers: Bool,
-            wordWrap: Bool
+            wordWrap: Bool,
+            syntaxMode: SyntaxHighlightMode
         ) {
             textView.font = .monospacedSystemFont(ofSize: CGFloat(fontSize), weight: .regular)
             textView.typingAttributes[.font] = textView.font
             configureWrapping(textView: textView, scrollView: scrollView, wordWrap: wordWrap)
             configureLineNumbers(textView: textView, scrollView: scrollView, showLineNumbers: showLineNumbers)
+            currentSyntaxMode = syntaxMode
+            applySyntax(to: textView, syntaxMode: syntaxMode)
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
             text.wrappedValue = textView.string
             lineNumberRuler?.needsDisplay = true
+            applySyntax(to: textView, syntaxMode: currentSyntaxMode)
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView else { return }
+            let range = textView.selectedRange()
+            guard range.location != NSNotFound, NSMaxRange(range) <= (textView.string as NSString).length else {
+                selectionChanged("")
+                return
+            }
+
+            selectionChanged((textView.string as NSString).substring(with: range))
         }
 
         @objc
@@ -155,6 +180,15 @@ struct PlainTextEditorView: NSViewRepresentable {
                 scrollView.hasVerticalRuler = false
                 scrollView.verticalRulerView = nil
             }
+        }
+
+        private func applySyntax(to textView: NSTextView, syntaxMode: SyntaxHighlightMode) {
+            guard !isApplyingSyntax else { return }
+            isApplyingSyntax = true
+            let selectedRanges = textView.selectedRanges
+            SyntaxHighlighter.apply(to: textView, mode: syntaxMode)
+            textView.selectedRanges = selectedRanges
+            isApplyingSyntax = false
         }
     }
 }

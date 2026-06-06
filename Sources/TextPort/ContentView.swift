@@ -32,6 +32,9 @@ struct ContentView: View {
             QuickOpenView()
                 .environmentObject(document)
         }
+        .sheet(isPresented: $document.showingDocumentStats) {
+            DocumentStatsView(stats: document.activeDocumentStats)
+        }
         .alert(item: $document.externalChangePrompt) { change in
             Alert(
                 title: Text("\(change.fileName) changed on disk"),
@@ -56,16 +59,15 @@ struct ContentView: View {
 
     private var editor: some View {
         ZStack {
-            PlainTextEditorView(
-                text: Binding(
-                get: { document.activeText },
-                set: { document.updateActiveText($0) }
-                ),
-                fontSize: preferences.fontSize,
-                showLineNumbers: preferences.showLineNumbers,
-                wordWrap: preferences.wordWrap
-            )
-            .background(Color(nsColor: .textBackgroundColor))
+            if document.splitViewEnabled, let secondaryTab = document.secondaryTab {
+                HStack(spacing: 1) {
+                    editorPane(for: document.activeTab)
+                    editorPane(for: secondaryTab)
+                }
+                .background(Color(nsColor: .separatorColor))
+            } else {
+                editorPane(for: document.activeTab)
+            }
 
             RoundedRectangle(cornerRadius: 0)
                 .stroke(Color.accentColor, lineWidth: isDroppingFile ? 3 : 0)
@@ -73,6 +75,54 @@ struct ContentView: View {
         }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDroppingFile) { providers in
             document.openDroppedFile(providers)
+        }
+    }
+
+    private func editorPane(for tab: TextDocumentTab) -> some View {
+        VStack(spacing: 0) {
+            if document.splitViewEnabled {
+                HStack {
+                    Text(tab.fileDisplayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Spacer()
+
+                    if tab.id == document.secondaryTabID {
+                        Picker("Split Tab", selection: Binding(
+                            get: { tab.id },
+                            set: { document.setSecondaryTab($0) }
+                        )) {
+                            ForEach(document.tabs) { option in
+                                Text(option.fileDisplayName).tag(option.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 170)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(nsColor: .windowBackgroundColor))
+            }
+
+            PlainTextEditorView(
+                tabID: tab.id,
+                text: Binding(
+                    get: { document.text(for: tab.id) },
+                    set: { document.updateText(for: tab.id, $0) }
+                ),
+                fontSize: preferences.fontSize,
+                showLineNumbers: preferences.showLineNumbers,
+                wordWrap: preferences.wordWrap,
+                syntaxMode: document.effectiveSyntaxMode(for: tab.id),
+                selectionChanged: { selectedText in
+                    document.updateSelectedText(for: tab.id, selectedText: selectedText)
+                }
+            )
+            .background(Color(nsColor: .textBackgroundColor))
         }
     }
 
