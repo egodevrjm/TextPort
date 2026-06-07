@@ -240,6 +240,20 @@ final class ProjectStore: ObservableObject {
         runTask(task, in: currentProject.rootURL)
     }
 
+    func runFile(at url: URL) {
+        guard let runCommand = RunFileCommand.make(for: url) else {
+            present(message: "\(url.lastPathComponent) does not have a supported file runner.")
+            return
+        }
+
+        let workingDirectoryURL = currentProject.flatMap { project in
+            isInsideProject(url) ? project.rootURL : nil
+        } ?? runCommand.defaultWorkingDirectoryURL
+
+        let task = RunTask(name: runCommand.name, command: runCommand.command)
+        runTask(task, in: workingDirectoryURL, selectPersistentTask: false)
+    }
+
     func stopTask() {
         guard taskRunState.isRunning else { return }
         taskRunner.stop()
@@ -359,13 +373,15 @@ final class ProjectStore: ObservableObject {
         return path == rootPath || path.hasPrefix(rootPath + "/")
     }
 
-    private func runTask(_ task: RunTask, in projectRootURL: URL) {
+    private func runTask(_ task: RunTask, in projectRootURL: URL, selectPersistentTask: Bool = true) {
         guard !task.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             present(message: "This task needs a command before it can run.")
             return
         }
 
-        selectedTaskID = task.id
+        if selectPersistentTask {
+            selectedTaskID = task.id
+        }
         bottomPanelMode = .output
         isBottomPanelVisible = true
         taskOutput = "$ \(task.command)\n"

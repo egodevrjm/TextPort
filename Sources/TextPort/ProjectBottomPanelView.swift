@@ -21,13 +21,18 @@ struct ProjectBottomPanelView: View {
 
     private var header: some View {
         HStack {
-            Picker("Panel", selection: $project.bottomPanelMode) {
-                ForEach(ProjectPanelMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
+            if project.hasProject {
+                Picker("Panel", selection: $project.bottomPanelMode) {
+                    ForEach(ProjectPanelMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+            } else {
+                Text("Output")
+                    .font(.headline)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 180)
 
             Spacer()
 
@@ -109,28 +114,34 @@ struct ProjectBottomPanelView: View {
     private var outputPanel: some View {
         VStack(spacing: 8) {
             HStack {
-                Picker("Task", selection: Binding(
-                    get: { project.selectedTaskID },
-                    set: { project.selectedTaskID = $0 }
-                )) {
-                    if project.tasks.isEmpty {
-                        Text("No Tasks").tag(Optional<UUID>.none)
-                    } else {
-                        ForEach(project.tasks) { task in
-                            Text(task.name).tag(Optional(task.id))
+                if project.hasProject {
+                    Picker("Task", selection: Binding(
+                        get: { project.selectedTaskID },
+                        set: { project.selectedTaskID = $0 }
+                    )) {
+                        if project.tasks.isEmpty {
+                            Text("No Tasks").tag(Optional<UUID>.none)
+                        } else {
+                            ForEach(project.tasks) { task in
+                                Text(task.name).tag(Optional(task.id))
+                            }
                         }
                     }
-                }
-                .frame(maxWidth: 240)
+                    .frame(maxWidth: 240)
 
-                Button {
-                    project.runSelectedTask()
-                } label: {
-                    Image(systemName: "play.fill")
-                        .frame(width: 22, height: 22)
+                    Button {
+                        project.runSelectedTask()
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .frame(width: 22, height: 22)
+                    }
+                    .disabled(project.tasks.isEmpty || project.taskRunState.isRunning)
+                    .help("Run Task")
+                } else {
+                    Text("File Output")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(project.tasks.isEmpty || project.taskRunState.isRunning)
-                .help("Run Task")
 
                 Button {
                     project.stopTask()
@@ -143,16 +154,18 @@ struct ProjectBottomPanelView: View {
 
                 Spacer()
 
-                Button {
-                    project.openTaskManager()
-                } label: {
-                    Label("Tasks", systemImage: "slider.horizontal.3")
+                if project.hasProject {
+                    Button {
+                        project.openTaskManager()
+                    } label: {
+                        Label("Tasks", systemImage: "slider.horizontal.3")
+                    }
+                    .help("Manage Tasks")
                 }
-                .help("Manage Tasks")
             }
 
             ScrollView {
-                Text(project.taskOutput.isEmpty ? "Task output appears here." : project.taskOutput)
+                Text(project.taskOutput.isEmpty ? "Output appears here." : project.taskOutput)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(project.taskOutput.isEmpty ? .secondary : .primary)
                     .textSelection(.enabled)

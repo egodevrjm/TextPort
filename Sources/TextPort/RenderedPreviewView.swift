@@ -8,6 +8,21 @@ enum RenderedPreviewKind {
     case table(DelimitedTextDelimiter)
     case svg
 
+    var label: String {
+        switch self {
+        case .html:
+            return "HTML"
+        case .markdown:
+            return "Markdown"
+        case .json:
+            return "JSON"
+        case .table(let delimiter):
+            return delimiter.label
+        case .svg:
+            return "SVG"
+        }
+    }
+
     static func detect(fileName: String, syntaxMode: SyntaxHighlightMode) -> RenderedPreviewKind? {
         switch fileName.fileExtension.lowercased() {
         case "csv":

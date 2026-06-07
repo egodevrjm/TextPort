@@ -10,6 +10,8 @@ It can:
 - create, rename, and move project files or folders to Trash
 - search across project text and code files
 - manage and run simple project tasks with streamed output
+- use a smart toolbar that adapts to the active file, including preview, JSON visualization, and runnable-code actions
+- run supported code files including Swift, Python, JavaScript, shell, Ruby, and Go with streamed output
 - open PDFs by extracting their text into a normal unsaved text tab
 - open Word `.docx` files by extracting their text into a normal unsaved text tab
 - open PowerPoint `.pptx` files by extracting slide text into a normal unsaved text tab

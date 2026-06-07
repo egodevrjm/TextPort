@@ -34,12 +34,23 @@ struct ContentView: View {
                 }
                 .help("Open Quickly")
 
-                Button {
-                    preferences.renderPreview.toggle()
-                } label: {
-                    Label(preferences.renderPreview ? "Edit Source" : "Render Preview", systemImage: preferences.renderPreview ? "pencil" : "eye")
+                if let previewKind = activePreviewKind {
+                    Button {
+                        preferences.renderPreview.toggle()
+                    } label: {
+                        Label(preferences.renderPreview ? "Edit Source" : "Render Preview", systemImage: preferences.renderPreview ? "pencil" : "eye")
+                    }
+                    .help(preferences.renderPreview ? "Show Source" : "Render \(previewKind.label) Preview")
                 }
-                .help(preferences.renderPreview ? "Show Source" : "Render Supported Previews")
+
+                if document.activeDocumentCanVisualizeJSON {
+                    Button {
+                        document.showJSONVisualizer()
+                    } label: {
+                        Label("Visualize JSON", systemImage: "chart.bar.doc.horizontal")
+                    }
+                    .help("Visualize JSON")
+                }
 
                 if project.hasProject {
                     Button {
@@ -48,13 +59,29 @@ struct ContentView: View {
                         Label("Find in Project", systemImage: "text.magnifyingglass")
                     }
                     .help("Find in Project")
+                }
+
+                if project.taskRunState.isRunning {
+                    Button {
+                        project.stopTask()
+                    } label: {
+                        Label("Stop", systemImage: "stop.fill")
+                    }
+                    .help("Stop Running Task")
+                } else if activeRunCommand != nil {
+                    Button {
+                        runActiveFile()
+                    } label: {
+                        Label("Run File", systemImage: "play.fill")
+                    }
+                    .help("Run \(document.fileDisplayName)")
+                } else if project.hasProject {
 
                     Button {
                         project.runSelectedTask()
                     } label: {
                         Label("Run Task", systemImage: "play.fill")
                     }
-                    .disabled(project.taskRunState.isRunning)
                     .help("Run Selected Task")
                 }
             }
@@ -147,7 +174,7 @@ struct ContentView: View {
 
             statusBar
 
-            if project.hasProject && project.isBottomPanelVisible {
+            if project.isBottomPanelVisible {
                 Divider()
                 ProjectBottomPanelView()
                     .environmentObject(document)
@@ -285,6 +312,27 @@ struct ContentView: View {
         project.persistOpenTabs(document.tabs)
         project.openProjectPanel()
         document.openFiles(at: project.consumeRestoredOpenTabURLs())
+    }
+
+    private var activePreviewKind: RenderedPreviewKind? {
+        RenderedPreviewKind.detect(
+            fileName: document.activeTab.fileDisplayName,
+            syntaxMode: document.effectiveSyntaxMode(for: document.activeTab.id)
+        )
+    }
+
+    private var activeRunCommand: RunFileCommand? {
+        guard let fileURL = document.activeTab.fileURL else { return nil }
+        return RunFileCommand.make(for: fileURL)
+    }
+
+    private func runActiveFile() {
+        if document.activeTab.isEdited {
+            document.saveDocument()
+        }
+
+        guard !document.activeTab.isEdited, let fileURL = document.activeTab.fileURL else { return }
+        project.runFile(at: fileURL)
     }
 }
 
