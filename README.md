@@ -10,6 +10,7 @@ It can:
 - create, rename, and move project files or folders to Trash
 - search across project text and code files
 - manage and run simple project tasks with streamed output
+- open PDFs by extracting their text into a normal unsaved text tab
 - work with multiple files in tabs
 - rename a saved file by clicking the title in the macOS title bar
 - set a suggested file name for unsaved tabs before saving

@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import PDFKit
 import UniformTypeIdentifiers
 
 @MainActor
@@ -547,14 +548,15 @@ final class TextDocumentStore: ObservableObject {
 
         do {
             let loadedFile = try TextFileLoader.load(url: url)
+            let isExtractedPDF = url.pathExtension.lowercased() == "pdf"
             let loadedTab = TextDocumentTab(
                 text: loadedFile.text,
-                fileURL: url,
-                displayName: url.lastPathComponent,
+                fileURL: isExtractedPDF ? nil : url,
+                displayName: isExtractedPDF ? "\(url.deletingPathExtension().lastPathComponent) PDF Text.txt" : url.lastPathComponent,
                 isEdited: false,
                 textEncoding: loadedFile.textEncoding,
                 preferredLineEnding: loadedFile.lineEnding,
-                lastKnownModificationDate: fileModificationDate(for: url)
+                lastKnownModificationDate: isExtractedPDF ? nil : fileModificationDate(for: url)
             )
 
             if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
@@ -565,7 +567,7 @@ final class TextDocumentStore: ObservableObject {
 
             selectedTabID = loadedTab.id
             addRecentFile(url)
-            statusText = "Opened \(url.lastPathComponent)"
+            statusText = isExtractedPDF ? "Extracted text from \(url.lastPathComponent)" : "Opened \(url.lastPathComponent)"
             scheduleSessionSave()
         } catch {
             present(error, action: "open")
@@ -1124,6 +1126,10 @@ struct LoadedTextFile {
 
 enum TextFileLoader {
     static func load(url: URL) throws -> LoadedTextFile {
+        if url.pathExtension.lowercased() == "pdf" {
+            return try loadPDF(url: url)
+        }
+
         let data = try Data(contentsOf: url)
 
         guard !looksBinary(data) || looksLikeUTF16(data) else {
@@ -1141,6 +1147,27 @@ enum TextFileLoader {
         }
 
         throw TextFileLoaderError.unsupportedEncoding
+    }
+
+    private static func loadPDF(url: URL) throws -> LoadedTextFile {
+        guard let document = PDFDocument(url: url) else {
+            throw TextFileLoaderError.unsupportedPDF
+        }
+
+        let pageText = (0..<document.pageCount)
+            .compactMap { document.page(at: $0)?.string }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !pageText.isEmpty else {
+            throw TextFileLoaderError.pdfTextUnavailable
+        }
+
+        return LoadedTextFile(
+            text: pageText.joined(separator: "\n\n"),
+            textEncoding: .utf8,
+            lineEnding: .lf
+        )
     }
 
     private static var encodingCandidates: [(encoding: String.Encoding, textEncoding: TextEncoding)] {
@@ -1442,12 +1469,18 @@ enum TextDraftStore {
 
 enum TextFileLoaderError: LocalizedError {
     case binaryFile
+    case pdfTextUnavailable
+    case unsupportedPDF
     case unsupportedEncoding
 
     var errorDescription: String? {
         switch self {
         case .binaryFile:
             "This looks like a binary file, not a plain text file."
+        case .pdfTextUnavailable:
+            "TextPort opened the PDF, but it does not contain extractable text."
+        case .unsupportedPDF:
+            "TextPort could not read this PDF."
         case .unsupportedEncoding:
             "The file uses an encoding TextPort does not recognize yet."
         }
