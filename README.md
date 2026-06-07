@@ -31,7 +31,7 @@ It can:
 - restore tabs and unsaved drafts when the app launches
 - open a second editor pane with Split View
 - view document and selection stats
-- visualize JSON as a human-readable structure from the Tools menu
+- visualize JSON as a sortable, clickable human-readable structure and export it as visual HTML
 - autosave unsaved and edited tabs to draft files
 - print or export the current tab to PDF
 - render HTML, Markdown, JSON, CSV, TSV, and SVG tabs with a source/preview toggle
