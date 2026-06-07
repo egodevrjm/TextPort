@@ -283,6 +283,12 @@ final class TextDocumentStore: ObservableObject {
         loadFile(at: url)
     }
 
+    func openFiles(at urls: [URL]) {
+        for url in urls {
+            loadFile(at: url)
+        }
+    }
+
     func showQuickOpen() {
         quickOpenQuery = ""
         showingQuickOpenSheet = true
@@ -294,6 +300,8 @@ final class TextDocumentStore: ObservableObject {
             selectTab(id)
             statusText = "Selected \(activeTab.fileDisplayName)"
         case .recentFile(let url):
+            openFile(at: url)
+        case .projectFile(let url):
             openFile(at: url)
         }
 
@@ -454,6 +462,43 @@ final class TextDocumentStore: ObservableObject {
 
     func printDocument() {
         PrintService.print(tab: activeTab, fontSize: preferences.fontSize)
+    }
+
+    func replaceFileReference(from oldURL: URL, to newURL: URL) {
+        var changedSelection = false
+        for index in tabs.indices {
+            guard let fileURL = tabs[index].fileURL, Self.url(fileURL, isSameOrInside: oldURL) else { continue }
+
+            let replacementURL = Self.replacementURL(for: fileURL, oldRoot: oldURL, newRoot: newURL)
+            tabs[index].fileURL = replacementURL
+            tabs[index].displayName = replacementURL.lastPathComponent
+            tabs[index].lastKnownModificationDate = fileModificationDate(for: replacementURL)
+            tabs[index].lastExternalChangePromptDate = nil
+            changedSelection = true
+        }
+
+        if changedSelection {
+            statusText = "Updated open file references"
+            scheduleSessionSave()
+        }
+    }
+
+    func detachFileReferences(inside removedURL: URL) {
+        var changedSelection = false
+        for index in tabs.indices {
+            guard let fileURL = tabs[index].fileURL, Self.url(fileURL, isSameOrInside: removedURL) else { continue }
+
+            tabs[index].fileURL = nil
+            tabs[index].isEdited = true
+            tabs[index].lastKnownModificationDate = nil
+            tabs[index].lastExternalChangePromptDate = nil
+            changedSelection = true
+        }
+
+        if changedSelection {
+            statusText = "Detached moved file references"
+            scheduleSessionSave()
+        }
     }
 
     func saveDocumentAs() {
@@ -772,6 +817,25 @@ final class TextDocumentStore: ObservableObject {
     private func fileModificationDate(for url: URL) -> Date? {
         try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
     }
+
+    private static func url(_ url: URL, isSameOrInside rootURL: URL) -> Bool {
+        let rootPath = rootURL.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        return path == rootPath || path.hasPrefix(rootPath + "/")
+    }
+
+    private static func replacementURL(for url: URL, oldRoot: URL, newRoot: URL) -> URL {
+        let oldPath = oldRoot.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+
+        guard path != oldPath else {
+            return newRoot
+        }
+
+        let relativeStart = path.index(path.startIndex, offsetBy: oldPath.count + 1)
+        let relativePath = String(path[relativeStart...])
+        return newRoot.appendingPathComponent(relativePath)
+    }
 }
 
 struct TextDocumentTab: Identifiable, Equatable, Codable {
@@ -882,6 +946,8 @@ struct QuickOpenItem: Identifiable, Equatable {
             "tab-\(id.uuidString)"
         case .recentFile(let url):
             "recent-\(url.path)"
+        case .projectFile(let url):
+            "project-\(url.path)"
         }
     }
 }
@@ -889,6 +955,7 @@ struct QuickOpenItem: Identifiable, Equatable {
 enum QuickOpenKind: Equatable {
     case openTab(UUID)
     case recentFile(URL)
+    case projectFile(URL)
 }
 
 enum SyntaxHighlightMode: String, CaseIterable, Codable {

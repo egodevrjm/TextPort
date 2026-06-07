@@ -2,6 +2,7 @@ import SwiftUI
 
 struct QuickOpenView: View {
     @EnvironmentObject private var document: TextDocumentStore
+    @EnvironmentObject private var project: ProjectStore
     @Environment(\.dismiss) private var dismiss
     @FocusState private var searchFocused: Bool
 
@@ -11,7 +12,7 @@ struct QuickOpenView: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
 
-            List(document.filteredQuickOpenItems) { item in
+            List(quickOpenItems) { item in
                 Button {
                     document.openQuickOpenItem(item)
                     dismiss()
@@ -56,12 +57,21 @@ struct QuickOpenView: View {
         }
     }
 
+    private var quickOpenItems: [QuickOpenItem] {
+        let projectItems = project.hasProject
+            ? project.quickOpenItems(matching: document.quickOpenQuery)
+            : []
+        return Array((document.filteredQuickOpenItems + projectItems).prefix(80))
+    }
+
     private func kindLabel(for kind: QuickOpenKind) -> String {
         switch kind {
         case .openTab:
             "Tab"
         case .recentFile:
             "Recent"
+        case .projectFile:
+            "Project"
         }
     }
 }

@@ -4,25 +4,67 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var document: TextDocumentStore
+    @EnvironmentObject private var project: ProjectStore
     @EnvironmentObject private var preferences: AppPreferences
     @State private var isDroppingFile = false
+    @State private var restoredProjectTabs = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            tabStrip
+        rootLayout
+        .toolbar {
+            ToolbarItemGroup {
+                Button {
+                    document.openDocument()
+                } label: {
+                    Label("Open File", systemImage: "doc.badge.plus")
+                }
+                .help("Open File")
 
-            editor
+                Button {
+                    openProjectPanel()
+                } label: {
+                    Label("Open Project", systemImage: "folder.badge.plus")
+                }
+                .help("Open Project")
 
-            statusBar
+                Button {
+                    document.showQuickOpen()
+                } label: {
+                    Label("Open Quickly", systemImage: "magnifyingglass")
+                }
+                .help("Open Quickly")
+
+                if project.hasProject {
+                    Button {
+                        project.showFindInProject()
+                    } label: {
+                        Label("Find in Project", systemImage: "text.magnifyingglass")
+                    }
+                    .help("Find in Project")
+
+                    Button {
+                        project.runSelectedTask()
+                    } label: {
+                        Label("Run Task", systemImage: "play.fill")
+                    }
+                    .disabled(project.taskRunState.isRunning)
+                    .help("Run Selected Task")
+                }
+            }
         }
         .background {
             WindowTitlebarAccessor()
                 .environmentObject(document)
                 .frame(width: 0, height: 0)
         }
-        .navigationTitle(document.windowTitle)
+        .navigationTitle(project.windowTitle(fileTitle: document.windowTitle))
         .onOpenURL { url in
-            document.openFile(at: url)
+            if ProjectStore.isDirectory(url) {
+                project.openProject(at: url)
+                document.openFiles(at: project.consumeRestoredOpenTabURLs())
+            } else {
+                document.openFile(at: url)
+            }
         }
         .sheet(isPresented: $document.showingExportSheet) {
             ExportView()
@@ -31,9 +73,14 @@ struct ContentView: View {
         .sheet(isPresented: $document.showingQuickOpenSheet) {
             QuickOpenView()
                 .environmentObject(document)
+                .environmentObject(project)
         }
         .sheet(isPresented: $document.showingDocumentStats) {
             DocumentStatsView(stats: document.activeDocumentStats)
+        }
+        .sheet(isPresented: $project.showingTaskManager) {
+            TaskManagerView()
+                .environmentObject(project)
         }
         .alert(item: $document.externalChangePrompt) { change in
             Alert(
@@ -52,8 +99,51 @@ struct ContentView: View {
         } message: {
             Text(document.errorMessage)
         }
+        .alert("Could Not Complete Project Action", isPresented: $project.showingError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(project.errorMessage)
+        }
+        .onAppear {
+            guard !restoredProjectTabs else { return }
+            restoredProjectTabs = true
+            document.openFiles(at: project.consumeRestoredOpenTabURLs())
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            project.persistOpenTabs(document.tabs)
+            project.persistCurrentState()
             document.persistSessionImmediately()
+        }
+    }
+
+    private var rootLayout: some View {
+        NavigationSplitView(columnVisibility: Binding(
+            get: { project.isSidebarVisible ? .all : .detailOnly },
+            set: { project.isSidebarVisible = $0 != .detailOnly }
+        )) {
+            ProjectSidebarView()
+                .environmentObject(document)
+                .environmentObject(project)
+        } detail: {
+            editorWorkspace
+        }
+    }
+
+    private var editorWorkspace: some View {
+        VStack(spacing: 0) {
+            tabStrip
+
+            editor
+
+            statusBar
+
+            if project.hasProject && project.isBottomPanelVisible {
+                Divider()
+                ProjectBottomPanelView()
+                    .environmentObject(document)
+                    .environmentObject(project)
+                    .frame(height: 220)
+            }
         }
     }
 
@@ -144,28 +234,42 @@ struct ContentView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
             }
 
             Spacer(minLength: 10)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.bar)
     }
 
     private var statusBar: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(document.statusText)
+                .lineLimit(1)
+
+            Divider()
+                .frame(height: 12)
+
             Text(document.detailText)
+                .lineLimit(1)
+
             Spacer()
+
             Text(document.lineCountText)
             Text(document.characterCountText)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .padding(.horizontal, 12)
+        .frame(height: 24)
+        .background(.bar)
+    }
+
+    private func openProjectPanel() {
+        project.persistOpenTabs(document.tabs)
+        project.openProjectPanel()
+        document.openFiles(at: project.consumeRestoredOpenTabURLs())
     }
 }
 
@@ -204,13 +308,9 @@ private struct TabButton: View {
         }
         .font(.caption)
         .padding(.leading, tab.isEdited ? 9 : 12)
-        .padding(.trailing, 6)
-        .frame(height: 30)
-        .background(isSelected ? Color(nsColor: .controlBackgroundColor) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(isSelected ? Color(nsColor: .separatorColor) : Color.clear)
-        }
+        .padding(.trailing, 5)
+        .frame(height: 26)
+        .background(isSelected ? Color(nsColor: .controlAccentColor).opacity(0.12) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

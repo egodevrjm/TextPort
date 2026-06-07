@@ -3,14 +3,16 @@ import SwiftUI
 @main
 struct TextPortApp: App {
     @StateObject private var document = TextDocumentStore()
+    @StateObject private var project = ProjectStore()
     @StateObject private var preferences = AppPreferences.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(document)
+                .environmentObject(project)
                 .environmentObject(preferences)
-                .frame(minWidth: 760, minHeight: 520)
+                .frame(minWidth: 900, minHeight: 560)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -23,6 +25,11 @@ struct TextPortApp: App {
                     document.openDocument()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                Button("Open Project...") {
+                    openProjectPanel()
+                }
+                .keyboardShortcut("o", modifiers: [.command, .option])
 
                 Button("Open Quickly...") {
                     document.showQuickOpen()
@@ -154,6 +161,103 @@ struct TextPortApp: App {
                 .keyboardShortcut("w", modifiers: .command)
             }
 
+            CommandMenu("Project") {
+                Button("Open Project...") {
+                    openProjectPanel()
+                }
+                .keyboardShortcut("o", modifiers: [.command, .option])
+
+                Menu("Open Recent Project") {
+                    if project.recentProjects.isEmpty {
+                        Button("No Recent Projects") {}
+                            .disabled(true)
+                    } else {
+                        ForEach(project.recentProjects) { recentProject in
+                            Button(recentProject.displayName) {
+                                openRecentProject(recentProject)
+                            }
+                        }
+                    }
+                }
+
+                Button("Close Project") {
+                    closeProject()
+                }
+                .disabled(!project.hasProject)
+
+                Divider()
+
+                Button("New File") {
+                    if let url = project.createFile() {
+                        document.openFile(at: url)
+                    }
+                }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(!project.hasProject)
+
+                Button("New Folder") {
+                    project.createFolder()
+                }
+                .disabled(!project.hasProject)
+
+                Button("Rename") {
+                    if let change = project.renameSelectedItem() {
+                        document.replaceFileReference(from: change.oldURL, to: change.newURL)
+                    }
+                }
+                .disabled(project.selectedFileURL == nil)
+
+                Button("Move to Trash") {
+                    if let trashedURL = project.moveSelectedItemToTrash() {
+                        document.detachFileReferences(inside: trashedURL)
+                    }
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(project.selectedFileURL == nil)
+
+                Divider()
+
+                Button("Find in Project") {
+                    project.showFindInProject()
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!project.hasProject)
+
+                Divider()
+
+                Button("Manage Tasks...") {
+                    project.openTaskManager()
+                }
+                .disabled(!project.hasProject)
+
+                Menu("Run Task") {
+                    if project.tasks.isEmpty {
+                        Button("No Tasks") {
+                            project.openTaskManager()
+                        }
+                    } else {
+                        ForEach(project.tasks) { task in
+                            Button(task.name) {
+                                project.runTask(task)
+                            }
+                        }
+                    }
+                }
+                .disabled(!project.hasProject)
+
+                Button("Run Selected Task") {
+                    project.runSelectedTask()
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(!project.hasProject || project.taskRunState.isRunning)
+
+                Button("Stop Task") {
+                    project.stopTask()
+                }
+                .keyboardShortcut(".", modifiers: .command)
+                .disabled(!project.taskRunState.isRunning)
+            }
+
             CommandMenu("Text") {
                 Menu("Syntax Highlighting") {
                     ForEach(SyntaxHighlightMode.allCases, id: \.self) { mode in
@@ -237,6 +341,13 @@ struct TextPortApp: App {
             }
 
             CommandMenu("View") {
+                Button(project.isSidebarVisible ? "Hide Project Sidebar" : "Show Project Sidebar") {
+                    project.toggleSidebar()
+                }
+                .keyboardShortcut("s", modifiers: [.command, .option])
+
+                Divider()
+
                 Toggle("Show Line Numbers", isOn: $preferences.showLineNumbers)
                 Toggle("Word Wrap", isOn: $preferences.wordWrap)
 
@@ -260,5 +371,21 @@ struct TextPortApp: App {
             PreferencesView()
                 .environmentObject(preferences)
         }
+    }
+
+    private func openProjectPanel() {
+        project.persistOpenTabs(document.tabs)
+        project.openProjectPanel()
+        document.openFiles(at: project.consumeRestoredOpenTabURLs())
+    }
+
+    private func openRecentProject(_ recentProject: Project) {
+        project.persistOpenTabs(document.tabs)
+        project.openProject(at: recentProject.rootURL)
+        document.openFiles(at: project.consumeRestoredOpenTabURLs())
+    }
+
+    private func closeProject() {
+        project.closeProject(openTabs: document.tabs)
     }
 }

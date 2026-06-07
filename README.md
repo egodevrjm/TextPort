@@ -1,10 +1,15 @@
 # TextPort
 
-TextPort is a very small native macOS plain text editor. Think Notepad, but Mac-native and less picky about text-file extensions.
+TextPort is a small native macOS plain text editor that is growing into a lightweight IDE. Think Notepad, but Mac-native, project-aware, and less picky about text-file extensions.
 
 It can:
 
 - create and edit plain text
+- open folders as projects
+- browse project files in a native sidebar
+- create, rename, and move project files or folders to Trash
+- search across project text and code files
+- manage and run simple project tasks with streamed output
 - work with multiple files in tabs
 - rename a saved file by clicking the title in the macOS title bar
 - set a suggested file name for unsaved tabs before saving
@@ -23,6 +28,7 @@ It can:
 - autosave unsaved and edited tabs to draft files
 - print or export the current tab to PDF
 - use lightweight syntax highlighting with automatic detection and manual mode selection
+- use Open Quickly to jump to open tabs, recent files, and project files
 - open text-like files even when the extension is unusual
 - open files by dragging them onto the editor
 - detect common encodings including UTF-8, UTF-16, ASCII, Windows Latin 1, and ISO Latin 1
@@ -39,7 +45,7 @@ swift build
 ## Run
 
 ```sh
-swift run TextPort
+./script/build_and_run.sh
 ```
 
 ## Create a Mac App Bundle
