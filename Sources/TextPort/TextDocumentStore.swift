@@ -1062,7 +1062,7 @@ enum SyntaxHighlightMode: String, CaseIterable, Codable {
             return .json
         case "md", "markdown", "mdown":
             return .markdown
-        case "html", "htm", "xml":
+        case "html", "htm", "xml", "svg":
             return .html
         case "css":
             return .css

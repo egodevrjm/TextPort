@@ -39,7 +39,7 @@ struct ContentView: View {
                 } label: {
                     Label(preferences.renderPreview ? "Edit Source" : "Render Preview", systemImage: preferences.renderPreview ? "pencil" : "eye")
                 }
-                .help(preferences.renderPreview ? "Show Source" : "Render HTML and Markdown")
+                .help(preferences.renderPreview ? "Show Source" : "Render Supported Previews")
 
                 if project.hasProject {
                     Button {

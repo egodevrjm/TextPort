@@ -12,7 +12,7 @@ struct PreferencesView: View {
 
                 Toggle("Show Line Numbers", isOn: $preferences.showLineNumbers)
                 Toggle("Word Wrap", isOn: $preferences.wordWrap)
-                Toggle("Render HTML and Markdown", isOn: $preferences.renderPreview)
+                Toggle("Render Supported Previews", isOn: $preferences.renderPreview)
             }
 
             Section("Defaults") {

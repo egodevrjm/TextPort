@@ -31,7 +31,7 @@ It can:
 - view document and selection stats
 - autosave unsaved and edited tabs to draft files
 - print or export the current tab to PDF
-- render HTML and Markdown tabs with a source/preview toggle
+- render HTML, Markdown, JSON, CSV, TSV, and SVG tabs with a source/preview toggle
 - use lightweight syntax highlighting with automatic detection and manual mode selection
 - use Open Quickly to jump to open tabs, recent files, and project files
 - open text-like files even when the extension is unusual
