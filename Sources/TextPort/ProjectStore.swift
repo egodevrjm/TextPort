@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 @MainActor
 final class ProjectStore: ObservableObject {
@@ -70,12 +71,32 @@ final class ProjectStore: ObservableObject {
         let panel = NSOpenPanel()
         panel.title = "Open Project"
         panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
+        panel.allowedContentTypes = [.folder, ProjectArchiveImporter.zipContentType]
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        openProject(at: url)
+        openProjectSelection(at: url)
+    }
+
+    func openProjectSelection(at url: URL) {
+        if Self.isDirectory(url) {
+            openProject(at: url)
+        } else if ProjectArchiveImporter.isZipArchive(url) {
+            openProjectArchive(at: url)
+        } else {
+            present(message: "\(url.lastPathComponent) is not a folder or zip archive.")
+        }
+    }
+
+    func openProjectArchive(at url: URL) {
+        do {
+            let extractedProjectURL = try ProjectArchiveImporter.extractProject(from: url)
+            openProject(at: extractedProjectURL)
+        } catch {
+            present(error, action: "open zip project")
+        }
     }
 
     func openProject(at url: URL, saveSession: Bool = true) {

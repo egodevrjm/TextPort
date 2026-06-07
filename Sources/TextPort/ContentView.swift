@@ -93,8 +93,8 @@ struct ContentView: View {
         }
         .navigationTitle(project.windowTitle(fileTitle: document.windowTitle))
         .onOpenURL { url in
-            if ProjectStore.isDirectory(url) {
-                project.openProject(at: url)
+            if ProjectStore.isDirectory(url) || ProjectArchiveImporter.isZipArchive(url) {
+                project.openProjectSelection(at: url)
                 document.openFiles(at: project.consumeRestoredOpenTabURLs())
             } else {
                 document.openFile(at: url)

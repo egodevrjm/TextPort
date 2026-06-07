@@ -6,6 +6,7 @@ It can:
 
 - create and edit plain text
 - open folders as projects
+- open `.zip` archives as projects by extracting them into TextPort's app-support folder
 - browse project files in a native sidebar
 - create, rename, and move project files or folders to Trash
 - search across project text and code files

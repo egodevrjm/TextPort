@@ -167,7 +167,7 @@ struct CommandPaletteView: View {
     private var commands: [CommandPaletteItem] {
         [
             CommandPaletteItem("Open File", "File") { document.openDocument() },
-            CommandPaletteItem("Open Project", "Project") { project.openProjectPanel(); document.openFiles(at: project.consumeRestoredOpenTabURLs()) },
+            CommandPaletteItem("Open Project or Zip", "Project") { project.openProjectPanel(); document.openFiles(at: project.consumeRestoredOpenTabURLs()) },
             CommandPaletteItem("Open Quickly", "File") { document.showQuickOpen() },
             CommandPaletteItem("New From Template", "File") { document.showTemplateChooser() },
             CommandPaletteItem("Open Scratchpad", "File") { document.openScratchpad() },

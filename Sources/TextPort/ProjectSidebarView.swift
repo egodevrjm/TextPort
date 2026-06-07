@@ -82,6 +82,7 @@ struct ProjectSidebarView: View {
                 Label("Open Project", systemImage: "folder.badge.plus")
             }
             .controlSize(.small)
+            .help("Open a folder or zip archive")
 
             if !project.recentProjects.isEmpty {
                 Divider()
