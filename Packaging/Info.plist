@@ -32,6 +32,8 @@
                 <string>log</string>
                 <string>pdf</string>
                 <string>docx</string>
+                <string>pptx</string>
+                <string>ppt</string>
                 <string>xlsx</string>
                 <string>xlsm</string>
                 <string>xls</string>

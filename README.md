@@ -12,6 +12,7 @@ It can:
 - manage and run simple project tasks with streamed output
 - open PDFs by extracting their text into a normal unsaved text tab
 - open Word `.docx` files by extracting their text into a normal unsaved text tab
+- open PowerPoint `.pptx` files by extracting slide text into a normal unsaved text tab
 - open Excel `.xlsx` and `.xlsm` files by converting each sheet into an unsaved CSV tab
 - work with multiple files in tabs
 - rename a saved file by clicking the title in the macOS title bar

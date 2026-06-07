@@ -113,7 +113,10 @@ enum ProjectSearchService {
                 continue
             }
 
-            guard !OfficeImportService.isSpreadsheet(url), !OfficeImportService.isLegacyExcel(url) else {
+            guard !OfficeImportService.isSpreadsheet(url),
+                  !OfficeImportService.isLegacyExcel(url),
+                  !OfficeImportService.isLegacyPowerPoint(url)
+            else {
                 continue
             }
 

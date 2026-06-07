@@ -34,14 +34,30 @@ enum SyntaxHighlighter {
             highlightHTML(in: storage, string: string)
         case .css:
             highlightCSS(in: storage, string: string)
+        case .cFamily:
+            highlightCode(in: storage, string: string, keywords: cFamilyKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
+        case .go:
+            highlightCode(in: storage, string: string, keywords: goKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
         case .javascript:
             highlightCode(in: storage, string: string, keywords: javascriptKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
+        case .java:
+            highlightCode(in: storage, string: string, keywords: javaKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
         case .swift:
             highlightCode(in: storage, string: string, keywords: swiftKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
         case .python:
             highlightCode(in: storage, string: string, keywords: pythonKeywords, commentPattern: #"#.*"#)
+        case .ruby:
+            highlightCode(in: storage, string: string, keywords: rubyKeywords, commentPattern: #"#.*"#)
+        case .rust:
+            highlightCode(in: storage, string: string, keywords: rustKeywords, commentPattern: #"//.*|/\*[\s\S]*?\*/"#)
         case .shell:
             highlightCode(in: storage, string: string, keywords: shellKeywords, commentPattern: #"#.*"#)
+        case .sql:
+            highlightCode(in: storage, string: string, keywords: sqlKeywords, commentPattern: #"--.*|/\*[\s\S]*?\*/"#)
+        case .toml:
+            highlightKeyValueData(in: storage, string: string)
+        case .yaml:
+            highlightKeyValueData(in: storage, string: string)
         }
 
         storage.endEditing()
@@ -151,6 +167,25 @@ enum SyntaxHighlighter {
               string: string)
     }
 
+    private static func highlightKeyValueData(in storage: NSTextStorage, string: NSString) {
+        apply(pattern: #"(?m)^\s*[A-Za-z0-9_.-]+(?=\s*[:=])"#,
+              color: .systemBlue,
+              storage: storage,
+              string: string)
+        apply(pattern: #""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'"#,
+              color: .systemRed,
+              storage: storage,
+              string: string)
+        apply(pattern: #"\b(true|false|null)\b|\b\d+(?:\.\d+)?\b"#,
+              color: .systemOrange,
+              storage: storage,
+              string: string)
+        apply(pattern: #"(?m)#.*$"#,
+              color: .systemGreen,
+              storage: storage,
+              string: string)
+    }
+
     private static func apply(
         pattern: String,
         color: NSColor,
@@ -180,11 +215,31 @@ enum SyntaxHighlighter {
         "return", "switch", "throw", "try", "var", "while", "yield"
     ]
 
+    private static let cFamilyKeywords = [
+        "auto", "break", "case", "char", "class", "const", "continue", "default", "delete", "do",
+        "double", "else", "enum", "extern", "float", "for", "if", "include", "int", "long",
+        "namespace", "new", "private", "protected", "public", "return", "short", "sizeof", "static", "struct",
+        "switch", "template", "typedef", "union", "unsigned", "using", "virtual", "void", "while"
+    ]
+
+    private static let goKeywords = [
+        "break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for",
+        "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return",
+        "select", "struct", "switch", "type", "var"
+    ]
+
     private static let swiftKeywords = [
         "actor", "as", "associatedtype", "async", "await", "break", "case", "catch", "class", "continue",
         "default", "defer", "do", "else", "enum", "extension", "for", "func", "guard", "if",
         "import", "in", "init", "let", "nil", "private", "protocol", "public", "return", "self",
         "static", "struct", "switch", "throw", "try", "var", "while"
+    ]
+
+    private static let javaKeywords = [
+        "abstract", "boolean", "break", "case", "catch", "class", "const", "continue", "default", "do",
+        "double", "else", "enum", "extends", "final", "finally", "for", "if", "implements", "import",
+        "int", "interface", "long", "new", "null", "package", "private", "protected", "public", "return",
+        "static", "super", "switch", "this", "throw", "throws", "try", "void", "while"
     ]
 
     private static let pythonKeywords = [
@@ -197,5 +252,26 @@ enum SyntaxHighlighter {
     private static let shellKeywords = [
         "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if",
         "in", "select", "then", "until", "while"
+    ]
+
+    private static let rubyKeywords = [
+        "alias", "and", "begin", "break", "case", "class", "def", "do", "else", "elsif",
+        "end", "ensure", "false", "for", "if", "in", "module", "next", "nil", "not",
+        "or", "redo", "rescue", "retry", "return", "self", "super", "then", "true", "unless",
+        "until", "when", "while", "yield"
+    ]
+
+    private static let rustKeywords = [
+        "as", "async", "await", "break", "const", "continue", "crate", "else", "enum", "extern",
+        "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+        "move", "mut", "pub", "ref", "return", "self", "static", "struct", "super", "trait",
+        "true", "type", "unsafe", "use", "where", "while"
+    ]
+
+    private static let sqlKeywords = [
+        "alter", "and", "as", "between", "by", "case", "create", "delete", "drop", "else",
+        "end", "from", "group", "having", "in", "insert", "into", "is", "join", "left",
+        "like", "limit", "not", "null", "on", "or", "order", "right", "select", "set",
+        "table", "then", "union", "update", "values", "when", "where"
     ]
 }

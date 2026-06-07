@@ -14,8 +14,12 @@ enum OfficeImportService {
         url.pathExtension.lowercased() == "xls"
     }
 
+    static func isLegacyPowerPoint(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "ppt"
+    }
+
     static func isExtractedTextDocument(_ url: URL) -> Bool {
-        ["docx", "pdf"].contains(url.pathExtension.lowercased())
+        ["docx", "pdf", "pptx"].contains(url.pathExtension.lowercased())
     }
 
     static func extractedDisplayName(for url: URL) -> String {
@@ -26,6 +30,8 @@ enum OfficeImportService {
             return "\(baseName) Word Text.txt"
         case "pdf":
             return "\(baseName) PDF Text.txt"
+        case "pptx":
+            return "\(baseName) PowerPoint Text.txt"
         default:
             return url.lastPathComponent
         }
@@ -37,6 +43,8 @@ enum OfficeImportService {
             return "Extracted text from \(url.lastPathComponent)"
         case "pdf":
             return "Extracted text from \(url.lastPathComponent)"
+        case "pptx":
+            return "Extracted slide text from \(url.lastPathComponent)"
         default:
             return "Opened \(url.lastPathComponent)"
         }
@@ -57,6 +65,36 @@ enum OfficeImportService {
         }
 
         return LoadedTextFile(text: text, textEncoding: .utf8, lineEnding: .lf)
+    }
+
+    static func loadPresentation(url: URL) throws -> LoadedTextFile {
+        let extractedDirectory = try ZipArchiveExtractor.extract(url: url)
+        defer { try? FileManager.default.removeItem(at: extractedDirectory) }
+
+        let slidesDirectory = extractedDirectory.appendingPathComponent("ppt/slides", isDirectory: true)
+        let slideURLs = ((try? FileManager.default.contentsOfDirectory(at: slidesDirectory, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "xml" && $0.lastPathComponent.hasPrefix("slide") }
+            .sorted { slideNumber(from: $0) < slideNumber(from: $1) }
+
+        guard !slideURLs.isEmpty else {
+            throw OfficeImportError.missingPresentationSlides
+        }
+
+        let slideTexts = try slideURLs.enumerated().compactMap { index, slideURL -> String? in
+            let text = try OfficeTextXMLParser.parse(url: slideURL)
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return "Slide \(index + 1)\n\(text)"
+        }
+
+        guard !slideTexts.isEmpty else {
+            throw OfficeImportError.noExtractableText
+        }
+
+        return LoadedTextFile(
+            text: slideTexts.joined(separator: "\n\n"),
+            textEncoding: .utf8,
+            lineEnding: .lf
+        )
     }
 
     static func loadSpreadsheet(url: URL) throws -> [ImportedSpreadsheetSheet] {
@@ -110,13 +148,21 @@ enum OfficeImportService {
 
         return xlDirectory.appendingPathComponent(target)
     }
+
+    private static func slideNumber(from url: URL) -> Int {
+        let fileName = url.deletingPathExtension().lastPathComponent
+        let digits = fileName.filter(\.isNumber)
+        return Int(digits) ?? Int.max
+    }
 }
 
 enum OfficeImportError: LocalizedError {
     case archiveExtractionFailed
     case emptyWorkbook
     case legacyExcelUnsupported
+    case legacyPowerPointUnsupported
     case missingWorkbook
+    case missingPresentationSlides
     case missingWordDocument
     case noExtractableText
     case xmlParsingFailed(String)
@@ -129,8 +175,12 @@ enum OfficeImportError: LocalizedError {
             "TextPort opened the workbook, but it did not contain any readable sheets."
         case .legacyExcelUnsupported:
             "Legacy .xls files are not supported yet. Save the workbook as .xlsx and open it again."
+        case .legacyPowerPointUnsupported:
+            "Legacy .ppt files are not supported yet. Save the presentation as .pptx and open it again."
         case .missingWorkbook:
             "TextPort could not find the workbook data in this Excel file."
+        case .missingPresentationSlides:
+            "TextPort could not find the slide data in this PowerPoint file."
         case .missingWordDocument:
             "TextPort could not find the document text in this Word file."
         case .noExtractableText:
@@ -163,12 +213,12 @@ private enum ZipArchiveExtractor {
     }
 }
 
-private final class WordDocumentXMLTextParser: NSObject, XMLParserDelegate {
+private final class OfficeTextXMLParser: NSObject, XMLParserDelegate {
     private var text = ""
     private var isReadingText = false
 
     static func parse(url: URL) throws -> String {
-        let parserDelegate = WordDocumentXMLTextParser()
+        let parserDelegate = OfficeTextXMLParser()
         try XMLParsing.run(url: url, delegate: parserDelegate)
         return parserDelegate.cleanedText
     }
@@ -214,6 +264,12 @@ private final class WordDocumentXMLTextParser: NSObject, XMLParserDelegate {
         } else if matches(elementName, "tc") {
             text += "\t"
         }
+    }
+}
+
+private enum WordDocumentXMLTextParser {
+    static func parse(url: URL) throws -> String {
+        try OfficeTextXMLParser.parse(url: url)
     }
 }
 

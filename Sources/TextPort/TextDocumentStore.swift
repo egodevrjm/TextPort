@@ -551,6 +551,11 @@ final class TextDocumentStore: ObservableObject {
             return
         }
 
+        if OfficeImportService.isLegacyPowerPoint(url) {
+            present(OfficeImportError.legacyPowerPointUnsupported, action: "open")
+            return
+        }
+
         if OfficeImportService.isSpreadsheet(url) {
             loadSpreadsheet(at: url)
             return
@@ -1015,10 +1020,18 @@ enum SyntaxHighlightMode: String, CaseIterable, Codable {
     case markdown
     case html
     case css
+    case cFamily
+    case go
     case javascript
+    case java
     case swift
     case python
+    case ruby
+    case rust
     case shell
+    case sql
+    case toml
+    case yaml
 
     var label: String {
         switch self {
@@ -1028,10 +1041,18 @@ enum SyntaxHighlightMode: String, CaseIterable, Codable {
         case .markdown: "Markdown"
         case .html: "HTML"
         case .css: "CSS"
+        case .cFamily: "C / C++"
+        case .go: "Go"
         case .javascript: "JavaScript"
+        case .java: "Java"
         case .swift: "Swift"
         case .python: "Python"
+        case .ruby: "Ruby"
+        case .rust: "Rust"
         case .shell: "Shell"
+        case .sql: "SQL"
+        case .toml: "TOML"
+        case .yaml: "YAML"
         }
     }
 
@@ -1045,14 +1066,30 @@ enum SyntaxHighlightMode: String, CaseIterable, Codable {
             return .html
         case "css":
             return .css
+        case "c", "h", "cc", "cpp", "cxx", "hpp", "hh":
+            return .cFamily
+        case "go":
+            return .go
         case "js", "mjs", "cjs", "ts", "tsx", "jsx":
             return .javascript
+        case "java":
+            return .java
         case "swift":
             return .swift
         case "py":
             return .python
+        case "rb":
+            return .ruby
+        case "rs":
+            return .rust
         case "sh", "bash", "zsh", "command":
             return .shell
+        case "sql":
+            return .sql
+        case "toml":
+            return .toml
+        case "yaml", "yml":
+            return .yaml
         default:
             break
         }
@@ -1176,6 +1213,8 @@ enum TextFileLoader {
     static func load(url: URL) throws -> LoadedTextFile {
         if url.pathExtension.lowercased() == "docx" {
             return try OfficeImportService.loadWordDocument(url: url)
+        } else if url.pathExtension.lowercased() == "pptx" {
+            return try OfficeImportService.loadPresentation(url: url)
         } else if url.pathExtension.lowercased() == "pdf" {
             return try loadPDF(url: url)
         }
