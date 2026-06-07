@@ -63,7 +63,10 @@ struct RenderedPreviewView: View {
         case .html:
             WebDocumentPreviewView(html: tab.text, baseURL: tab.fileURL?.deletingLastPathComponent())
         case .markdown:
-            MarkdownPreviewView(markdown: tab.text)
+            WebDocumentPreviewView(
+                html: MarkdownHTMLRenderer.html(for: tab.text),
+                baseURL: tab.fileURL?.deletingLastPathComponent()
+            )
         case .json:
             JSONPreviewView(json: tab.text)
         case .table(let delimiter):
@@ -71,30 +74,6 @@ struct RenderedPreviewView: View {
         case .svg:
             SVGPreviewView(svg: tab.text, baseURL: tab.fileURL?.deletingLastPathComponent())
         }
-    }
-}
-
-private struct MarkdownPreviewView: View {
-    let markdown: String
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                markdownText
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(28)
-        }
-        .background(Color(nsColor: .textBackgroundColor))
-    }
-
-    private var markdownText: Text {
-        if let attributedString = try? AttributedString(markdown: markdown) {
-            return Text(attributedString)
-        }
-
-        return Text(markdown)
     }
 }
 
