@@ -171,6 +171,7 @@ struct CommandPaletteView: View {
             CommandPaletteItem("Open Quickly", "File") { document.showQuickOpen() },
             CommandPaletteItem("New From Template", "File") { document.showTemplateChooser() },
             CommandPaletteItem("Open Scratchpad", "File") { document.openScratchpad() },
+            CommandPaletteItem("TextPort Guide", "Help") { document.showHelpGuide(section: .about) },
             CommandPaletteItem("Compare Tabs", "Tools") { document.showTabCompare() },
             CommandPaletteItem("Document Outline", "Tools") { document.showDocumentOutline() },
             CommandPaletteItem("Format Document", "Text") { document.formatDocument() },
@@ -181,6 +182,9 @@ struct CommandPaletteView: View {
             CommandPaletteItem("Export", "File") { document.showingExportSheet = true },
             CommandPaletteItem(project.isSidebarVisible ? "Hide Project Sidebar" : "Show Project Sidebar", "View") { project.toggleSidebar() },
             CommandPaletteItem(preferences.renderPreview ? "Show Source" : "Render Preview", "View") { preferences.renderPreview.toggle() },
+            CommandPaletteItem("Run Current File", "Run", isEnabled: document.activeFileRunCommand != nil && !project.taskRunState.isRunning) {
+                document.runActiveFile(using: project)
+            },
             CommandPaletteItem("Show Output Panel", "Project", isEnabled: project.hasProject) { project.showTaskOutput() },
             CommandPaletteItem("Run Selected Task", "Project", isEnabled: project.hasProject && !project.taskRunState.isRunning) { project.runSelectedTask() },
             CommandPaletteItem("Stop Task", "Project", isEnabled: project.taskRunState.isRunning) { project.stopTask() }
@@ -203,8 +207,7 @@ struct CommandPaletteView: View {
             List(filteredCommands) { command in
                 Button {
                     guard command.isEnabled else { return }
-                    dismiss()
-                    command.action()
+                    perform(command)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -223,6 +226,13 @@ struct CommandPaletteView: View {
         }
         .padding(16)
         .frame(width: 520, height: 480)
+    }
+
+    private func perform(_ command: CommandPaletteItem) {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            command.action()
+        }
     }
 }
 

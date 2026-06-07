@@ -13,7 +13,9 @@ It can:
 - manage and run simple project tasks with streamed output
 - use a smart toolbar that adapts to the active file, including preview, JSON visualization, and runnable-code actions
 - run supported code files including Swift, Python, JavaScript, shell, Ruby, and Go with streamed output
+- run the current supported code file from the smart toolbar or command palette
 - use a command palette for common app, text, project, and tool actions
+- open an About/TextPort Guide covering editing, imports, projects, Save vs Export, the command palette, and running code
 - create common files from lightweight templates
 - keep a persistent Scratchpad for temporary notes and snippets
 - format or minify supported structured documents

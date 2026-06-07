@@ -137,6 +137,10 @@ struct ContentView: View {
             FileTemplateChooserView()
                 .environmentObject(document)
         }
+        .sheet(isPresented: $document.showingHelpGuide) {
+            HelpGuideView()
+                .environmentObject(document)
+        }
         .sheet(isPresented: $project.showingTaskManager) {
             TaskManagerView()
                 .environmentObject(project)
@@ -344,17 +348,11 @@ struct ContentView: View {
     }
 
     private var activeRunCommand: RunFileCommand? {
-        guard let fileURL = document.activeTab.fileURL else { return nil }
-        return RunFileCommand.make(for: fileURL)
+        document.activeFileRunCommand
     }
 
     private func runActiveFile() {
-        if document.activeTab.isEdited {
-            document.saveDocument()
-        }
-
-        guard !document.activeTab.isEdited, let fileURL = document.activeTab.fileURL else { return }
-        project.runFile(at: fileURL)
+        document.runActiveFile(using: project)
     }
 }
 

@@ -220,8 +220,15 @@ final class TaskRunner {
 
         process.terminationHandler = { [weak self] terminatedProcess in
             pipe.fileHandleForReading.readabilityHandler = nil
+            let remainingData = pipe.fileHandleForReading.readDataToEndOfFile()
+            let remainingText = remainingData.isEmpty
+                ? ""
+                : (String(data: remainingData, encoding: .utf8) ?? String(decoding: remainingData, as: UTF8.self))
 
             Task { @MainActor in
+                if !remainingText.isEmpty {
+                    output(remainingText)
+                }
                 self?.process = nil
                 completion(terminatedProcess.terminationStatus)
             }

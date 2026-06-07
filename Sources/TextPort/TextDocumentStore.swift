@@ -26,6 +26,8 @@ final class TextDocumentStore: ObservableObject {
     @Published var showingTabCompare = false
     @Published var showingDocumentOutline = false
     @Published var showingTemplateChooser = false
+    @Published var showingHelpGuide = false
+    @Published var helpGuideSection: HelpGuideSection = .about
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
@@ -101,6 +103,11 @@ final class TextDocumentStore: ObservableObject {
 
     var activeDocumentCanExportRenderedMarkdownHTML: Bool {
         effectiveSyntaxMode(for: selectedTabID) == .markdown
+    }
+
+    var activeFileRunCommand: RunFileCommand? {
+        guard let fileURL = activeTab.fileURL else { return nil }
+        return RunFileCommand.make(for: fileURL)
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -331,6 +338,13 @@ final class TextDocumentStore: ObservableObject {
 
     func showCommandPalette() {
         showingCommandPalette = true
+        statusText = "Command palette"
+    }
+
+    func showHelpGuide(section: HelpGuideSection = .about) {
+        helpGuideSection = section
+        showingHelpGuide = true
+        statusText = "TextPort help"
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
@@ -609,6 +623,15 @@ final class TextDocumentStore: ObservableObject {
 
     func printDocument() {
         PrintService.print(tab: activeTab, fontSize: preferences.fontSize)
+    }
+
+    func runActiveFile(using project: ProjectStore) {
+        if activeTab.isEdited {
+            saveDocument()
+        }
+
+        guard !activeTab.isEdited, let fileURL = activeTab.fileURL else { return }
+        project.runFile(at: fileURL)
     }
 
     func replaceFileReference(from oldURL: URL, to newURL: URL) {

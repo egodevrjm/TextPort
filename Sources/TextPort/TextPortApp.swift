@@ -15,6 +15,12 @@ struct TextPortApp: App {
                 .frame(minWidth: 900, minHeight: 560)
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About TextPort") {
+                    document.showHelpGuide(section: .about)
+                }
+            }
+
             CommandGroup(replacing: .newItem) {
                 Button("New Tab") {
                     document.newDocument()
@@ -411,6 +417,20 @@ struct TextPortApp: App {
                 }
                 .keyboardShortcut("j", modifiers: [.command, .option])
                 .disabled(!document.activeDocumentCanVisualizeJSON)
+
+                Divider()
+
+                Button("TextPort Guide") {
+                    document.showHelpGuide(section: .basics)
+                }
+
+                Button("Save and Export Guide") {
+                    document.showHelpGuide(section: .saveExport)
+                }
+
+                Button("Run Guide") {
+                    document.showHelpGuide(section: .run)
+                }
             }
         }
 
