@@ -85,6 +85,9 @@ struct ContentView: View {
         .sheet(isPresented: $document.showingDocumentStats) {
             DocumentStatsView(stats: document.activeDocumentStats)
         }
+        .sheet(isPresented: $document.showingJSONVisualizer) {
+            JSONVisualStructureView(documentName: document.fileDisplayName, json: document.activeText)
+        }
         .sheet(isPresented: $project.showingTaskManager) {
             TaskManagerView()
                 .environmentObject(project)

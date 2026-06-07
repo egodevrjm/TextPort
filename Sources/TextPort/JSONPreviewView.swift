@@ -118,7 +118,7 @@ private struct JSONNodeView: View {
     }
 }
 
-private enum JSONPreviewParser {
+enum JSONPreviewParser {
     static func parse(_ json: String) -> Result<JSONPreviewValue, Error> {
         do {
             let data = Data(json.utf8)
@@ -130,13 +130,13 @@ private enum JSONPreviewParser {
     }
 }
 
-private struct JSONPreviewObjectEntry: Identifiable {
+struct JSONPreviewObjectEntry: Identifiable {
     let id = UUID()
     let key: String
     let value: JSONPreviewValue
 }
 
-private indirect enum JSONPreviewValue {
+indirect enum JSONPreviewValue {
     case object([JSONPreviewObjectEntry])
     case array([JSONPreviewValue])
     case string(String)

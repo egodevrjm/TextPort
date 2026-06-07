@@ -366,6 +366,12 @@ struct TextPortApp: App {
                     document.showDocumentStats()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+
+                Button("Visualize JSON...") {
+                    document.showJSONVisualizer()
+                }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+                .disabled(!document.activeDocumentCanVisualizeJSON)
             }
         }
 

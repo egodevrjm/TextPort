@@ -20,6 +20,7 @@ final class TextDocumentStore: ObservableObject {
     @Published var splitViewEnabled = false
     @Published var secondaryTabID: UUID?
     @Published var showingDocumentStats = false
+    @Published var showingJSONVisualizer = false
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
@@ -87,6 +88,10 @@ final class TextDocumentStore: ObservableObject {
 
     var activeDocumentStats: DocumentStats {
         stats(for: selectedTabID)
+    }
+
+    var activeDocumentCanVisualizeJSON: Bool {
+        effectiveSyntaxMode(for: selectedTabID) == .json
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -194,6 +199,11 @@ final class TextDocumentStore: ObservableObject {
             tab.syntaxMode = mode
         }
         statusText = "Syntax mode set to \(mode.label)"
+    }
+
+    func showJSONVisualizer() {
+        showingJSONVisualizer = true
+        statusText = "Visualizing JSON"
     }
 
     func toggleSplitView() {
