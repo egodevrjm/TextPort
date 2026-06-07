@@ -30,6 +30,11 @@
                 <string>md</string>
                 <string>markdown</string>
                 <string>log</string>
+                <string>pdf</string>
+                <string>docx</string>
+                <string>xlsx</string>
+                <string>xlsm</string>
+                <string>xls</string>
                 <string>csv</string>
                 <string>tsv</string>
                 <string>json</string>
@@ -72,6 +77,7 @@
                 <string>public.source-code</string>
                 <string>public.json</string>
                 <string>public.xml</string>
+                <string>com.adobe.pdf</string>
                 <string>public.comma-separated-values-text</string>
                 <string>net.daringfireball.markdown</string>
             </array>

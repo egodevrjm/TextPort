@@ -546,17 +546,27 @@ final class TextDocumentStore: ObservableObject {
             return
         }
 
+        if OfficeImportService.isLegacyExcel(url) {
+            present(OfficeImportError.legacyExcelUnsupported, action: "open")
+            return
+        }
+
+        if OfficeImportService.isSpreadsheet(url) {
+            loadSpreadsheet(at: url)
+            return
+        }
+
         do {
             let loadedFile = try TextFileLoader.load(url: url)
-            let isExtractedPDF = url.pathExtension.lowercased() == "pdf"
+            let isExtractedText = OfficeImportService.isExtractedTextDocument(url)
             let loadedTab = TextDocumentTab(
                 text: loadedFile.text,
-                fileURL: isExtractedPDF ? nil : url,
-                displayName: isExtractedPDF ? "\(url.deletingPathExtension().lastPathComponent) PDF Text.txt" : url.lastPathComponent,
-                isEdited: false,
+                fileURL: isExtractedText ? nil : url,
+                displayName: isExtractedText ? OfficeImportService.extractedDisplayName(for: url) : url.lastPathComponent,
+                isEdited: isExtractedText,
                 textEncoding: loadedFile.textEncoding,
                 preferredLineEnding: loadedFile.lineEnding,
-                lastKnownModificationDate: isExtractedPDF ? nil : fileModificationDate(for: url)
+                lastKnownModificationDate: isExtractedText ? nil : fileModificationDate(for: url)
             )
 
             if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
@@ -567,7 +577,45 @@ final class TextDocumentStore: ObservableObject {
 
             selectedTabID = loadedTab.id
             addRecentFile(url)
-            statusText = isExtractedPDF ? "Extracted text from \(url.lastPathComponent)" : "Opened \(url.lastPathComponent)"
+            statusText = isExtractedText ? OfficeImportService.extractedStatus(for: url) : "Opened \(url.lastPathComponent)"
+            scheduleSessionSave()
+        } catch {
+            present(error, action: "open")
+        }
+    }
+
+    private func loadSpreadsheet(at url: URL) {
+        do {
+            let sheets = try OfficeImportService.loadSpreadsheet(url: url)
+            let baseName = url.deletingPathExtension().lastPathComponent
+            let loadedTabs = sheets.map { sheet in
+                TextDocumentTab(
+                    text: sheet.csvText,
+                    fileURL: nil,
+                    displayName: "\(baseName) - \(sheet.name).csv",
+                    isEdited: true,
+                    textEncoding: .utf8,
+                    preferredLineEnding: .lf,
+                    syntaxMode: .automatic
+                )
+            }
+
+            guard let firstTab = loadedTabs.first else {
+                throw OfficeImportError.emptyWorkbook
+            }
+
+            if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
+                tabs[activeTabIndex] = firstTab
+                tabs.append(contentsOf: loadedTabs.dropFirst())
+            } else {
+                tabs.append(contentsOf: loadedTabs)
+            }
+
+            selectedTabID = firstTab.id
+            addRecentFile(url)
+            statusText = loadedTabs.count == 1
+                ? "Converted \(url.lastPathComponent) to CSV"
+                : "Converted \(url.lastPathComponent) to \(loadedTabs.count) CSV tabs"
             scheduleSessionSave()
         } catch {
             present(error, action: "open")
@@ -1126,7 +1174,9 @@ struct LoadedTextFile {
 
 enum TextFileLoader {
     static func load(url: URL) throws -> LoadedTextFile {
-        if url.pathExtension.lowercased() == "pdf" {
+        if url.pathExtension.lowercased() == "docx" {
+            return try OfficeImportService.loadWordDocument(url: url)
+        } else if url.pathExtension.lowercased() == "pdf" {
             return try loadPDF(url: url)
         }
 

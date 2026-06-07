@@ -113,6 +113,10 @@ enum ProjectSearchService {
                 continue
             }
 
+            guard !OfficeImportService.isSpreadsheet(url), !OfficeImportService.isLegacyExcel(url) else {
+                continue
+            }
+
             guard (values?.fileSize ?? 0) <= maxFileSize else {
                 continue
             }
