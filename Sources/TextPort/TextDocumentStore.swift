@@ -1345,8 +1345,13 @@ enum TextFileLoader {
             throw TextFileLoaderError.pdfTextUnavailable
         }
 
+        let text = ImportedTextCleaner.clean(pageText.joined(separator: "\n\n"), source: .pdf)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw TextFileLoaderError.pdfTextUnavailable
+        }
+
         return LoadedTextFile(
-            text: pageText.joined(separator: "\n\n"),
+            text: text,
             textEncoding: .utf8,
             lineEnding: .lf
         )

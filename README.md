@@ -22,8 +22,8 @@ It can:
 - see Git status badges in project sidebars
 - run one-off project commands from the output panel
 - export open tabs as a zip bundle
-- open PDFs by extracting their text into a normal unsaved text tab
-- open Word `.docx` files by extracting their text into a normal unsaved text tab
+- open PDFs by extracting cleaned body text into a normal unsaved text tab
+- open Word `.docx` files by extracting cleaned body text into a normal unsaved text tab
 - open PowerPoint `.pptx` files by extracting slide text into a normal unsaved text tab
 - open Excel `.xlsx` and `.xlsm` files by converting each sheet into an unsaved CSV tab
 - work with multiple files in tabs

@@ -59,7 +59,10 @@ enum OfficeImportService {
             throw OfficeImportError.missingWordDocument
         }
 
-        let text = try WordDocumentXMLTextParser.parse(url: documentURL)
+        let text = ImportedTextCleaner.clean(
+            try WordDocumentXMLTextParser.parse(url: documentURL),
+            source: .wordDocument
+        )
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OfficeImportError.noExtractableText
         }
