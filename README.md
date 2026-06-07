@@ -42,6 +42,9 @@ It can:
 - open a second editor pane with Split View
 - view document and selection stats
 - visualize JSON as a sortable, clickable human-readable structure and export it as visual HTML
+- distinguish Save/Save As for editable source files from Export for generated outputs
+- save an editable source copy as `.txt`, `.md`, `.html`, `.css`, `.js`, `.json`, `.xml`, `.csv`, `.yaml`, `.toml`, `.ini`, `.env`, `.sh`, `.swift`, `.py`, `.sql`, `.tex`, `.rst`, `.log`, or any custom extension
+- export generated outputs including PDF, rendered Markdown HTML, visual JSON HTML, and open-tab zip bundles
 - autosave unsaved and edited tabs to draft files
 - print or export the current tab to PDF
 - render HTML, Markdown, JSON, CSV, TSV, and SVG tabs with a source/preview toggle
@@ -52,7 +55,6 @@ It can:
 - detect common encodings including UTF-8, UTF-16, ASCII, Windows Latin 1, and ISO Latin 1
 - warn before replacing unsaved work
 - save and save as UTF-8 text
-- export the current text as `.txt`, `.md`, `.html`, `.css`, `.js`, `.json`, `.xml`, `.csv`, `.yaml`, `.toml`, `.ini`, `.env`, `.sh`, `.swift`, `.py`, `.sql`, `.tex`, `.rst`, `.log`, or any custom extension
 
 ## Build
 

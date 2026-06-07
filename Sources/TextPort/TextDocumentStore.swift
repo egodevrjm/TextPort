@@ -10,6 +10,7 @@ final class TextDocumentStore: ObservableObject {
     @Published var selectedTabID: UUID
     @Published var statusText = "Ready"
     @Published var showingExportSheet = false
+    @Published var showingSaveCopySheet = false
     @Published var showingError = false
     @Published var errorMessage = ""
     @Published var titleEditRequestID = UUID()
@@ -96,6 +97,10 @@ final class TextDocumentStore: ObservableObject {
 
     var activeDocumentCanVisualizeJSON: Bool {
         effectiveSyntaxMode(for: selectedTabID) == .json
+    }
+
+    var activeDocumentCanExportRenderedMarkdownHTML: Bool {
+        effectiveSyntaxMode(for: selectedTabID) == .markdown
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -544,13 +549,61 @@ final class TextDocumentStore: ObservableObject {
     }
 
     func exportPDF() {
-        guard let url = chooseSaveURL(defaultExtension: "pdf", title: "Export PDF", tab: activeTab) else { return }
+        let tab = activeTab
+        guard let url = chooseSaveURL(
+            defaultExtension: "pdf",
+            title: "Export PDF",
+            tab: tab,
+            suggestedName: suggestedOutputFileName(fileExtension: "pdf", tab: tab)
+        ) else { return }
 
         do {
-            try PDFTextExporter.export(tab: activeTab, fontSize: preferences.fontSize, to: url)
+            try PDFTextExporter.export(tab: tab, fontSize: preferences.fontSize, to: url)
             statusText = "Exported \(url.lastPathComponent)"
         } catch {
             present(error, action: "export PDF")
+        }
+    }
+
+    func exportRenderedMarkdownHTML() {
+        guard activeDocumentCanExportRenderedMarkdownHTML else {
+            present(message: "TextPort can export rendered HTML from Markdown files.")
+            return
+        }
+
+        let tab = activeTab
+        guard let url = chooseSaveURL(
+            defaultExtension: "html",
+            title: "Export Rendered Markdown HTML",
+            tab: tab,
+            suggestedName: suggestedOutputFileName(fileExtension: "html", tab: tab, suffix: "-rendered")
+        ) else { return }
+
+        do {
+            try MarkdownHTMLRenderer.html(for: tab.text).write(to: url, atomically: true, encoding: .utf8)
+            statusText = "Exported \(url.lastPathComponent)"
+        } catch {
+            present(error, action: "export rendered HTML")
+        }
+    }
+
+    func exportJSONVisualHTML() {
+        guard activeDocumentCanVisualizeJSON else {
+            present(message: "TextPort can export visual HTML from JSON files.")
+            return
+        }
+
+        switch JSONPreviewParser.parse(activeTab.text) {
+        case .success(let root):
+            do {
+                if let url = try JSONVisualHTMLExporter.export(root: root, documentName: fileDisplayName) {
+                    statusText = "Exported \(url.lastPathComponent)"
+                }
+            } catch {
+                present(error, action: "export JSON visual")
+            }
+        case .failure(let error):
+            present(message: "TextPort could not export this JSON. \(error.localizedDescription)")
         }
     }
 
@@ -597,15 +650,20 @@ final class TextDocumentStore: ObservableObject {
 
     func saveDocumentAs() {
         let tab = activeTab
-        guard let destination = chooseSaveURL(defaultExtension: defaultFileExtension(for: tab), title: "Save Text", tab: tab) else { return }
+        guard let destination = chooseSaveURL(defaultExtension: defaultFileExtension(for: tab), title: "Save Source As", tab: tab) else { return }
         write(to: destination, for: tab.id, action: "save", updatesDocumentURL: true)
     }
 
-    func exportDocument(fileExtension: String) {
+    func saveCopyAs(fileExtension: String) {
         let cleanExtension = fileExtension.isEmpty ? "txt" : fileExtension
         let tab = activeTab
-        guard let destination = chooseSaveURL(defaultExtension: cleanExtension, title: "Export Text", tab: tab) else { return }
-        write(to: destination, for: tab.id, action: "export", updatesDocumentURL: false)
+        guard let destination = chooseSaveURL(
+            defaultExtension: cleanExtension,
+            title: "Save Copy As",
+            tab: tab,
+            suggestedName: suggestedOutputFileName(fileExtension: cleanExtension, tab: tab)
+        ) else { return }
+        write(to: destination, for: tab.id, action: "save copy", updatesDocumentURL: false)
     }
 
     private var activeTabIndex: Int {
@@ -725,10 +783,15 @@ final class TextDocumentStore: ObservableObject {
         return tabs.count == 1 && tab.fileURL == nil && tab.text.isEmpty && !tab.isEdited && tab.displayName == "Untitled"
     }
 
-    private func chooseSaveURL(defaultExtension: String, title: String, tab: TextDocumentTab) -> URL? {
+    private func chooseSaveURL(
+        defaultExtension: String,
+        title: String,
+        tab: TextDocumentTab,
+        suggestedName: String? = nil
+    ) -> URL? {
         let panel = NSSavePanel()
         panel.title = title
-        panel.nameFieldStringValue = suggestedFileName(fileExtension: defaultExtension, tab: tab)
+        panel.nameFieldStringValue = suggestedName ?? suggestedFileName(fileExtension: defaultExtension, tab: tab)
         panel.canCreateDirectories = true
         panel.allowedContentTypes = [UTType(filenameExtension: defaultExtension) ?? .plainText]
         panel.allowsOtherFileTypes = true
@@ -744,6 +807,13 @@ final class TextDocumentStore: ObservableObject {
         }
 
         return "\(name).\(fileExtension)"
+    }
+
+    private func suggestedOutputFileName(fileExtension: String, tab: TextDocumentTab, suffix: String = "") -> String {
+        let trimmedName = tab.displayName.trimmedFileName
+        let name = trimmedName.isEmpty ? "Untitled" : trimmedName
+        let baseName = name.fileExtension.isEmpty ? name : (name as NSString).deletingPathExtension
+        return "\(baseName)\(suffix).\(fileExtension)"
     }
 
     private func write(to url: URL, for id: UUID, action: String, updatesDocumentURL: Bool) {
@@ -766,7 +836,7 @@ final class TextDocumentStore: ObservableObject {
             }
 
             addRecentFile(url)
-            statusText = action == "export" ? "Exported \(url.lastPathComponent)" : "Saved \(url.lastPathComponent)"
+            statusText = action == "save copy" ? "Saved copy \(url.lastPathComponent)" : "Saved \(url.lastPathComponent)"
             scheduleSessionSave()
         } catch {
             present(error, action: action)

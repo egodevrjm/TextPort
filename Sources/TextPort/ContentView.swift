@@ -104,6 +104,10 @@ struct ContentView: View {
             ExportView()
                 .environmentObject(document)
         }
+        .sheet(isPresented: $document.showingSaveCopySheet) {
+            SaveCopyView()
+                .environmentObject(document)
+        }
         .sheet(isPresented: $document.showingQuickOpenSheet) {
             QuickOpenView()
                 .environmentObject(document)

@@ -94,21 +94,17 @@ struct TextPortApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
 
+                Button("Save Copy As...") {
+                    document.showingSaveCopySheet = true
+                }
+                .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+
                 Divider()
 
                 Button("Export...") {
                     document.showingExportSheet = true
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
-
-                Button("Export PDF...") {
-                    document.exportPDF()
-                }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
-
-                Button("Export Open Tabs Bundle...") {
-                    document.exportOpenTabsBundle()
-                }
             }
 
             CommandGroup(replacing: .printItem) {

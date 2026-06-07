@@ -84,7 +84,7 @@ struct JSONVisualStructureView: View {
 
     private func export(_ root: JSONPreviewValue) {
         do {
-            try JSONVisualHTMLExporter.export(root: root, documentName: documentName)
+            _ = try JSONVisualHTMLExporter.export(root: root, documentName: documentName)
         } catch {
             exportErrorMessage = error.localizedDescription
             showingExportError = true
@@ -929,17 +929,18 @@ private extension String {
     }
 }
 
-private enum JSONVisualHTMLExporter {
+enum JSONVisualHTMLExporter {
     @MainActor
-    static func export(root: JSONPreviewValue, documentName: String) throws {
+    static func export(root: JSONPreviewValue, documentName: String) throws -> URL? {
         let panel = NSSavePanel()
         panel.title = "Export JSON Visual"
         panel.allowedContentTypes = [.html]
         panel.nameFieldStringValue = "\((documentName as NSString).deletingPathExtension)-visual.html"
         panel.canCreateDirectories = true
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         try html(root: root, documentName: documentName).write(to: url, atomically: true, encoding: .utf8)
+        return url
     }
 
     private static func html(root: JSONPreviewValue, documentName: String) -> String {
