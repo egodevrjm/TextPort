@@ -34,6 +34,13 @@ struct ContentView: View {
                 }
                 .help("Open Quickly")
 
+                Button {
+                    preferences.renderPreview.toggle()
+                } label: {
+                    Label(preferences.renderPreview ? "Edit Source" : "Render Preview", systemImage: preferences.renderPreview ? "pencil" : "eye")
+                }
+                .help(preferences.renderPreview ? "Show Source" : "Render HTML and Markdown")
+
                 if project.hasProject {
                     Button {
                         project.showFindInProject()
@@ -198,21 +205,26 @@ struct ContentView: View {
                 .background(Color(nsColor: .windowBackgroundColor))
             }
 
-            PlainTextEditorView(
-                tabID: tab.id,
-                text: Binding(
-                    get: { document.text(for: tab.id) },
-                    set: { document.updateText(for: tab.id, $0) }
-                ),
-                fontSize: preferences.fontSize,
-                showLineNumbers: preferences.showLineNumbers,
-                wordWrap: preferences.wordWrap,
-                syntaxMode: document.effectiveSyntaxMode(for: tab.id),
-                selectionChanged: { selectedText in
-                    document.updateSelectedText(for: tab.id, selectedText: selectedText)
-                }
-            )
-            .background(Color(nsColor: .textBackgroundColor))
+            let syntaxMode = document.effectiveSyntaxMode(for: tab.id)
+            if preferences.renderPreview, let previewKind = RenderedPreviewKind.detect(fileName: tab.fileDisplayName, syntaxMode: syntaxMode) {
+                RenderedPreviewView(tab: tab, kind: previewKind)
+            } else {
+                PlainTextEditorView(
+                    tabID: tab.id,
+                    text: Binding(
+                        get: { document.text(for: tab.id) },
+                        set: { document.updateText(for: tab.id, $0) }
+                    ),
+                    fontSize: preferences.fontSize,
+                    showLineNumbers: preferences.showLineNumbers,
+                    wordWrap: preferences.wordWrap,
+                    syntaxMode: syntaxMode,
+                    selectionChanged: { selectedText in
+                        document.updateSelectedText(for: tab.id, selectedText: selectedText)
+                    }
+                )
+                .background(Color(nsColor: .textBackgroundColor))
+            }
         }
     }
 

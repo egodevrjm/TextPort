@@ -16,6 +16,10 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    @Published var renderPreview: Bool {
+        didSet { save() }
+    }
+
     @Published var restoreSession: Bool {
         didSet { save() }
     }
@@ -43,6 +47,7 @@ final class AppPreferences: ObservableObject {
             fontSize = stored.fontSize
             showLineNumbers = stored.showLineNumbers
             wordWrap = stored.wordWrap
+            renderPreview = stored.renderPreview ?? false
             restoreSession = stored.restoreSession
             reuseBlankTabWhenOpening = stored.reuseBlankTabWhenOpening
             defaultEncoding = stored.defaultEncoding
@@ -51,6 +56,7 @@ final class AppPreferences: ObservableObject {
             fontSize = 14
             showLineNumbers = false
             wordWrap = true
+            renderPreview = false
             restoreSession = true
             reuseBlankTabWhenOpening = true
             defaultEncoding = .utf8
@@ -63,6 +69,7 @@ final class AppPreferences: ObservableObject {
             fontSize: fontSize,
             showLineNumbers: showLineNumbers,
             wordWrap: wordWrap,
+            renderPreview: renderPreview,
             restoreSession: restoreSession,
             reuseBlankTabWhenOpening: reuseBlankTabWhenOpening,
             defaultEncoding: defaultEncoding,
@@ -78,6 +85,7 @@ private struct StoredPreferences: Codable {
     var fontSize: Double
     var showLineNumbers: Bool
     var wordWrap: Bool
+    var renderPreview: Bool?
     var restoreSession: Bool
     var reuseBlankTabWhenOpening: Bool
     var defaultEncoding: TextEncoding

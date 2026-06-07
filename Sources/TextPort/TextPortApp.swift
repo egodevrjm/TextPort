@@ -350,6 +350,8 @@ struct TextPortApp: App {
 
                 Toggle("Show Line Numbers", isOn: $preferences.showLineNumbers)
                 Toggle("Word Wrap", isOn: $preferences.wordWrap)
+                Toggle("Render HTML and Markdown", isOn: $preferences.renderPreview)
+                    .keyboardShortcut("p", modifiers: [.command, .option])
 
                 Divider()
 
