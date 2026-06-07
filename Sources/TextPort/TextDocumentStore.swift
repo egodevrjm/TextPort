@@ -21,6 +21,10 @@ final class TextDocumentStore: ObservableObject {
     @Published var secondaryTabID: UUID?
     @Published var showingDocumentStats = false
     @Published var showingJSONVisualizer = false
+    @Published var showingCommandPalette = false
+    @Published var showingTabCompare = false
+    @Published var showingDocumentOutline = false
+    @Published var showingTemplateChooser = false
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
@@ -242,6 +246,21 @@ final class TextDocumentStore: ObservableObject {
         scheduleSessionSave()
     }
 
+    func newDocument(text: String, displayName: String, syntaxMode: SyntaxHighlightMode = .automatic) {
+        let tab = TextDocumentTab(
+            text: text,
+            displayName: displayName,
+            isEdited: !text.isEmpty,
+            textEncoding: preferences.defaultEncoding,
+            preferredLineEnding: preferences.defaultLineEnding,
+            syntaxMode: syntaxMode
+        )
+        tabs.append(tab)
+        selectedTabID = tab.id
+        statusText = "New \(displayName)"
+        scheduleSessionSave()
+    }
+
     func closeActiveTab() {
         closeTab(selectedTabID)
     }
@@ -303,6 +322,10 @@ final class TextDocumentStore: ObservableObject {
     func showQuickOpen() {
         quickOpenQuery = ""
         showingQuickOpenSheet = true
+    }
+
+    func showCommandPalette() {
+        showingCommandPalette = true
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
@@ -458,6 +481,66 @@ final class TextDocumentStore: ObservableObject {
 
     func showDocumentStats() {
         showingDocumentStats = true
+    }
+
+    func showDocumentOutline() {
+        showingDocumentOutline = true
+    }
+
+    func showTabCompare() {
+        showingTabCompare = true
+    }
+
+    func showTemplateChooser() {
+        showingTemplateChooser = true
+    }
+
+    func openScratchpad() {
+        do {
+            let url = try ScratchpadStore.url()
+            if !FileManager.default.fileExists(atPath: url.path) {
+                try Data().write(to: url, options: .atomic)
+            }
+            openFile(at: url)
+            statusText = "Opened Scratchpad"
+        } catch {
+            present(error, action: "open Scratchpad")
+        }
+    }
+
+    func formatDocument() {
+        guard let formatted = DocumentFormatter.format(
+            text: activeTab.text,
+            fileName: activeTab.fileDisplayName,
+            syntaxMode: effectiveSyntaxMode(for: selectedTabID)
+        ) else {
+            present(message: "TextPort does not have a formatter for this document type yet.")
+            return
+        }
+
+        applyTextTransform("Formatted \(activeTab.fileDisplayName)") { _ in formatted }
+    }
+
+    func minifyDocument() {
+        guard let minified = DocumentFormatter.minify(
+            text: activeTab.text,
+            fileName: activeTab.fileDisplayName,
+            syntaxMode: effectiveSyntaxMode(for: selectedTabID)
+        ) else {
+            present(message: "TextPort does not have a minifier for this document type yet.")
+            return
+        }
+
+        applyTextTransform("Minified \(activeTab.fileDisplayName)") { _ in minified }
+    }
+
+    func exportOpenTabsBundle() {
+        do {
+            try TextBundleExporter.export(tabs: tabs)
+            statusText = "Exported bundle"
+        } catch {
+            present(error, action: "export bundle")
+        }
     }
 
     func exportPDF() {

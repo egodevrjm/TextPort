@@ -162,6 +162,15 @@ private struct ProjectFileTreeRow: View {
                 .truncationMode(.middle)
 
             Spacer(minLength: 0)
+
+            if let status = project.gitStatus(for: node.url) {
+                Text(status)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+            }
         }
         .font(.callout)
         .padding(.leading, CGFloat(depth * 14))

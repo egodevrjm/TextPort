@@ -12,6 +12,15 @@ It can:
 - manage and run simple project tasks with streamed output
 - use a smart toolbar that adapts to the active file, including preview, JSON visualization, and runnable-code actions
 - run supported code files including Swift, Python, JavaScript, shell, Ruby, and Go with streamed output
+- use a command palette for common app, text, project, and tool actions
+- create common files from lightweight templates
+- keep a persistent Scratchpad for temporary notes and snippets
+- format or minify supported structured documents
+- compare two open tabs in a lightweight diff view
+- inspect a document outline for Markdown, JSON, HTML, and common code symbols
+- see Git status badges in project sidebars
+- run one-off project commands from the output panel
+- export open tabs as a zip bundle
 - open PDFs by extracting their text into a normal unsaved text tab
 - open Word `.docx` files by extracting their text into a normal unsaved text tab
 - open PowerPoint `.pptx` files by extracting slide text into a normal unsaved text tab

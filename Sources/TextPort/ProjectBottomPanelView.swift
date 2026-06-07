@@ -137,6 +137,25 @@ struct ProjectBottomPanelView: View {
                     }
                     .disabled(project.tasks.isEmpty || project.taskRunState.isRunning)
                     .help("Run Task")
+
+                    Divider()
+                        .frame(height: 18)
+
+                    TextField("Run command", text: $project.terminalCommand)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                        .onSubmit {
+                            project.runTerminalCommand()
+                        }
+
+                    Button {
+                        project.runTerminalCommand()
+                    } label: {
+                        Image(systemName: "terminal")
+                            .frame(width: 22, height: 22)
+                    }
+                    .disabled(project.terminalCommand.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || project.taskRunState.isRunning)
+                    .help("Run Command")
                 } else {
                     Text("File Output")
                         .font(.callout.weight(.medium))

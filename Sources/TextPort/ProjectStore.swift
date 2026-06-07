@@ -20,6 +20,8 @@ final class ProjectStore: ObservableObject {
     @Published var showingTaskManager = false
     @Published var showingError = false
     @Published var errorMessage = ""
+    @Published var terminalCommand = ""
+    @Published var gitStatusByPath: [String: String] = [:]
 
     private let taskRunner = TaskRunner()
     private var restoredOpenTabURLs: [URL] = []
@@ -138,6 +140,7 @@ final class ProjectStore: ObservableObject {
         }
 
         rootNodes = ProjectFileScanner.scan(rootURL: currentProject.rootURL)
+        gitStatusByPath = GitStatusService.statuses(rootURL: currentProject.rootURL)
     }
 
     func consumeRestoredOpenTabURLs() -> [URL] {
@@ -252,6 +255,18 @@ final class ProjectStore: ObservableObject {
 
         let task = RunTask(name: runCommand.name, command: runCommand.command)
         runTask(task, in: workingDirectoryURL, selectPersistentTask: false)
+    }
+
+    func runTerminalCommand() {
+        guard let currentProject else { return }
+        let command = terminalCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !command.isEmpty else { return }
+        let task = RunTask(name: command, command: command)
+        runTask(task, in: currentProject.rootURL, selectPersistentTask: false)
+    }
+
+    func gitStatus(for url: URL) -> String? {
+        gitStatusByPath[url.standardizedFileURL.path]
     }
 
     func stopTask() {

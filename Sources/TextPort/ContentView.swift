@@ -109,11 +109,29 @@ struct ContentView: View {
                 .environmentObject(document)
                 .environmentObject(project)
         }
+        .sheet(isPresented: $document.showingCommandPalette) {
+            CommandPaletteView()
+                .environmentObject(document)
+                .environmentObject(project)
+                .environmentObject(preferences)
+        }
         .sheet(isPresented: $document.showingDocumentStats) {
             DocumentStatsView(stats: document.activeDocumentStats)
         }
         .sheet(isPresented: $document.showingJSONVisualizer) {
             JSONVisualStructureView(documentName: document.fileDisplayName, json: document.activeText)
+        }
+        .sheet(isPresented: $document.showingTabCompare) {
+            TabCompareView()
+                .environmentObject(document)
+        }
+        .sheet(isPresented: $document.showingDocumentOutline) {
+            DocumentOutlineView()
+                .environmentObject(document)
+        }
+        .sheet(isPresented: $document.showingTemplateChooser) {
+            FileTemplateChooserView()
+                .environmentObject(document)
         }
         .sheet(isPresented: $project.showingTaskManager) {
             TaskManagerView()

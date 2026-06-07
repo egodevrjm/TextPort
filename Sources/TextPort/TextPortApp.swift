@@ -36,6 +36,21 @@ struct TextPortApp: App {
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
 
+                Button("Command Palette...") {
+                    document.showCommandPalette()
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+
+                Button("New From Template...") {
+                    document.showTemplateChooser()
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+
+                Button("Open Scratchpad") {
+                    document.openScratchpad()
+                }
+                .keyboardShortcut("0", modifiers: [.command, .option])
+
                 Menu("Open Recent") {
                     if document.recentFiles.isEmpty {
                         Button("No Recent Files") {}
@@ -90,6 +105,10 @@ struct TextPortApp: App {
                     document.exportPDF()
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button("Export Open Tabs Bundle...") {
+                    document.exportOpenTabsBundle()
+                }
             }
 
             CommandGroup(replacing: .printItem) {
@@ -223,6 +242,11 @@ struct TextPortApp: App {
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!project.hasProject)
 
+                Button("Show Output Panel") {
+                    project.showTaskOutput()
+                }
+                .disabled(!project.hasProject)
+
                 Divider()
 
                 Button("Manage Tasks...") {
@@ -271,6 +295,15 @@ struct TextPortApp: App {
 
                 Button("Trim Trailing Whitespace") {
                     document.trimTrailingWhitespace()
+                }
+
+                Button("Format Document") {
+                    document.formatDocument()
+                }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+
+                Button("Minify Document") {
+                    document.minifyDocument()
                 }
 
                 Button("Sort Lines") {
@@ -366,6 +399,16 @@ struct TextPortApp: App {
                     document.showDocumentStats()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+
+                Button("Document Outline...") {
+                    document.showDocumentOutline()
+                }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+
+                Button("Compare Tabs...") {
+                    document.showTabCompare()
+                }
+                .keyboardShortcut("d", modifiers: [.command, .option])
 
                 Button("Visualize JSON...") {
                     document.showJSONVisualizer()
