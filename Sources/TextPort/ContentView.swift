@@ -134,6 +134,10 @@ struct ContentView: View {
         .sheet(isPresented: $document.showingFileInfo) {
             FileInfoView(info: document.activeFileInfo)
         }
+        .sheet(isPresented: $document.showingGoToLine) {
+            GoToLineView()
+                .environmentObject(document)
+        }
         .sheet(isPresented: $document.showingJSONVisualizer) {
             JSONVisualStructureView(documentName: document.fileDisplayName, json: document.activeText)
         }
@@ -313,6 +317,7 @@ struct ContentView: View {
                     wordWrap: preferences.wordWrap,
                     syntaxMode: syntaxMode,
                     customSyntaxDefinition: customSyntax,
+                    selectionRequest: document.selectionRequest,
                     selectionChanged: { selectedText, selectedRange in
                         document.updateSelection(for: tab.id, selectedText: selectedText, range: selectedRange)
                     }

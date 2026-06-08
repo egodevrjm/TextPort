@@ -82,6 +82,11 @@ struct TextPortApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
 
+                Button("Reveal in Finder") {
+                    document.revealActiveFileInFinder()
+                }
+                .disabled(!document.activeTabHasSavedFile)
+
                 Divider()
 
                 Button("Close Tab") {
@@ -422,6 +427,52 @@ struct TextPortApp: App {
 
                 Button("Lowercase") {
                     document.lowercaseText()
+                }
+
+                Divider()
+
+                Menu("Lines") {
+                    Button("Go to Line...") {
+                        document.showGoToLine()
+                    }
+                    .keyboardShortcut("l", modifiers: .command)
+
+                    Button("Select Line") {
+                        document.selectLine()
+                    }
+
+                    Divider()
+
+                    Button("Duplicate Line") {
+                        document.duplicateLine()
+                    }
+
+                    Button("Move Line Up") {
+                        document.moveLineUp()
+                    }
+                    .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+
+                    Button("Move Line Down") {
+                        document.moveLineDown()
+                    }
+                    .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+
+                    Button("Delete Line") {
+                        document.deleteLine()
+                    }
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
+
+                    Button("Join Lines") {
+                        document.joinLines()
+                    }
+
+                    Divider()
+
+                    Button("Toggle Line Comment") {
+                        document.toggleLineComment()
+                    }
+                    .keyboardShortcut("/", modifiers: .command)
+                    .disabled(!document.activeDocumentCanToggleLineComment)
                 }
 
                 Button("Insert Date and Time") {

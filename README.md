@@ -46,6 +46,7 @@ It can:
 - use native macOS menu bar commands for file and tab actions
 - reopen recent files and use Open Quickly to jump to open tabs or recent files
 - find and replace text with the native macOS text find panel
+- use editor line commands for Go to Line, select, duplicate, move, delete, join, and toggle comments
 - preserve a file's encoding and line endings when saving
 - choose save encoding and line-ending style from the Text menu
 - detect when an open file changes on disk and offer to reload it

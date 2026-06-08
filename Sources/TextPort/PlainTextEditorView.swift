@@ -10,6 +10,7 @@ struct PlainTextEditorView: NSViewRepresentable {
     var wordWrap: Bool
     var syntaxMode: SyntaxHighlightMode
     var customSyntaxDefinition: CustomSyntaxDefinition?
+    var selectionRequest: TextSelectionRequest?
     var selectionChanged: (String, NSRange) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -81,6 +82,7 @@ struct PlainTextEditorView: NSViewRepresentable {
             syntaxMode: syntaxMode,
             customSyntaxDefinition: customSyntaxDefinition
         )
+        context.coordinator.applySelectionRequest(selectionRequest, tabID: tabID, to: textView)
     }
 
     static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
@@ -97,6 +99,7 @@ struct PlainTextEditorView: NSViewRepresentable {
         private var isApplyingSyntax = false
         private var currentSyntaxMode: SyntaxHighlightMode = .plainText
         private var currentCustomSyntaxDefinition: CustomSyntaxDefinition?
+        private var lastAppliedSelectionRequestID: UUID?
 
         init(text: Binding<String>, selectionChanged: @escaping (String, NSRange) -> Void) {
             self.text = text
@@ -141,6 +144,26 @@ struct PlainTextEditorView: NSViewRepresentable {
             }
 
             selectionChanged((textView.string as NSString).substring(with: range), range)
+        }
+
+        func applySelectionRequest(_ request: TextSelectionRequest?, tabID: UUID, to textView: NSTextView) {
+            guard let request, request.tabID == tabID, request.id != lastAppliedSelectionRequestID else { return }
+
+            let textLength = (textView.string as NSString).length
+            let location = min(max(request.range.location, 0), textLength)
+            let length = min(max(request.range.length, 0), textLength - location)
+            let range = NSRange(location: location, length: length)
+
+            textView.setSelectedRange(range)
+            textView.scrollRangeToVisible(range)
+            textView.window?.makeFirstResponder(textView)
+            lastAppliedSelectionRequestID = request.id
+
+            if range.length > 0 {
+                selectionChanged((textView.string as NSString).substring(with: range), range)
+            } else {
+                selectionChanged("", range)
+            }
         }
 
         @objc

@@ -98,6 +98,55 @@ struct DocumentOutlineView: View {
     }
 }
 
+struct GoToLineView: View {
+    @EnvironmentObject private var document: TextDocumentStore
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isTextFieldFocused: Bool
+    @State private var lineNumberText = ""
+
+    private var lineNumber: Int? {
+        let value = lineNumberText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let number = Int(value), number > 0 else { return nil }
+        return number
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Go to Line")
+                .font(.headline)
+
+            TextField("Line number", text: $lineNumberText)
+                .textFieldStyle(.roundedBorder)
+                .focused($isTextFieldFocused)
+                .onSubmit(go)
+
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Go", action: go)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(lineNumber == nil)
+            }
+        }
+        .padding(18)
+        .frame(width: 300)
+        .onAppear {
+            isTextFieldFocused = true
+        }
+    }
+
+    private func go() {
+        guard let lineNumber else { return }
+        document.goToLine(lineNumber)
+        dismiss()
+    }
+}
+
 struct TabCompareView: View {
     @EnvironmentObject private var document: TextDocumentStore
     @State private var leftID: UUID?
@@ -171,12 +220,21 @@ struct CommandPaletteView: View {
             CommandPaletteItem("Open Quickly", "File") { document.showQuickOpen() },
             CommandPaletteItem("New From Template", "File") { document.showTemplateChooser() },
             CommandPaletteItem("Open Scratchpad", "File") { document.openScratchpad() },
+            CommandPaletteItem("Reveal in Finder", "File", isEnabled: document.activeTabHasSavedFile) { document.revealActiveFileInFinder() },
             CommandPaletteItem("TextPort Guide", "Help") { document.showHelpGuide(section: .about) },
             CommandPaletteItem("Compare Tabs", "Tools") { document.showTabCompare() },
             CommandPaletteItem("Document Outline", "Tools") { document.showDocumentOutline() },
             CommandPaletteItem("File Info", "Tools") { document.showFileInfo() },
             CommandPaletteItem("Format Document", "Text") { document.formatDocument() },
             CommandPaletteItem("Minify Document", "Text") { document.minifyDocument() },
+            CommandPaletteItem("Go to Line", "Text") { document.showGoToLine() },
+            CommandPaletteItem("Select Line", "Text") { document.selectLine() },
+            CommandPaletteItem("Duplicate Line", "Text") { document.duplicateLine() },
+            CommandPaletteItem("Move Line Up", "Text") { document.moveLineUp() },
+            CommandPaletteItem("Move Line Down", "Text") { document.moveLineDown() },
+            CommandPaletteItem("Delete Line", "Text") { document.deleteLine() },
+            CommandPaletteItem("Join Lines", "Text") { document.joinLines() },
+            CommandPaletteItem("Toggle Line Comment", "Text", isEnabled: document.activeDocumentCanToggleLineComment) { document.toggleLineComment() },
             CommandPaletteItem("Document Stats", "Tools") { document.showDocumentStats() },
             CommandPaletteItem("Reopen Closed Tab", "Tabs", isEnabled: document.canReopenClosedTab) { document.reopenClosedTab() },
             CommandPaletteItem("Close Other Tabs", "Tabs", isEnabled: document.tabs.count > 1) { document.closeOtherTabs() },

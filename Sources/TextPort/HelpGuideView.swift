@@ -151,6 +151,7 @@ private struct HelpGuideDetail: View {
                         "Use the Tabs menu to reopen the last closed tab, close other tabs, or close tabs to the right.",
                         "Click the title-bar name to rename a saved file or set the suggested name for an unsaved tab.",
                         "Use automatic syntax highlighting by default, or choose a syntax mode from the Text menu.",
+                        "Use Text > Lines for Go to Line, Select Line, Duplicate, Move, Delete, Join, and Toggle Line Comment.",
                         "The status bar shows cursor line and column, plus selected text counts when text is selected."
                     ]
                 )
@@ -242,6 +243,7 @@ private struct HelpGuideDetail: View {
                     items: [
                         "Search common file, project, view, text, export, and run actions from one place.",
                         "Palette actions now wait for the palette sheet to close before opening another sheet or panel.",
+                        "Line editing commands are available from the palette as searchable text actions.",
                         "Disabled actions stay visible when context matters, such as JSON tools without a JSON tab."
                     ]
                 )

@@ -29,9 +29,11 @@ final class TextDocumentStore: ObservableObject {
     @Published var showingTemplateChooser = false
     @Published var showingHelpGuide = false
     @Published var showingCustomSyntaxManager = false
+    @Published var showingGoToLine = false
     @Published var fileImportProgress: FileImportProgress?
     @Published var sessionRecoveryNotice: SessionRecoveryNotice?
     @Published var helpGuideSection: HelpGuideSection = .about
+    @Published var selectionRequest: TextSelectionRequest?
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
@@ -155,6 +157,14 @@ final class TextDocumentStore: ObservableObject {
 
     var canCloseTabsToRight: Bool {
         activeTabIndex < tabs.count - 1
+    }
+
+    var activeTabHasSavedFile: Bool {
+        activeTab.fileURL != nil
+    }
+
+    var activeDocumentCanToggleLineComment: Bool {
+        lineCommentToken(for: effectiveSyntaxMode(for: selectedTabID)) != nil
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -606,6 +616,80 @@ final class TextDocumentStore: ObservableObject {
         applyTextTransform("Converted to lowercase") { tab in
             tab.text.lowercased()
         }
+    }
+
+    func duplicateLine() {
+        applyLineEdit("Duplicated line") { text, selection, lineEnding in
+            EditorTextOperations.duplicateLines(text: text, selection: selection, preferredLineEnding: lineEnding)
+        }
+    }
+
+    func moveLineUp() {
+        applyOptionalLineEdit("Moved line up", emptyStatus: "Already at first line") { text, selection, _ in
+            EditorTextOperations.moveLinesUp(text: text, selection: selection)
+        }
+    }
+
+    func moveLineDown() {
+        applyOptionalLineEdit("Moved line down", emptyStatus: "Already at last line") { text, selection, _ in
+            EditorTextOperations.moveLinesDown(text: text, selection: selection)
+        }
+    }
+
+    func deleteLine() {
+        applyOptionalLineEdit("Deleted line", emptyStatus: "Nothing to delete") { text, selection, _ in
+            EditorTextOperations.deleteLines(text: text, selection: selection)
+        }
+    }
+
+    func joinLines() {
+        applyOptionalLineEdit("Joined lines", emptyStatus: "No following line to join") { text, selection, _ in
+            EditorTextOperations.joinLines(text: text, selection: selection)
+        }
+    }
+
+    func toggleLineComment() {
+        let syntaxMode = effectiveSyntaxMode(for: selectedTabID)
+        guard let token = lineCommentToken(for: syntaxMode) else {
+            present(message: "TextPort does not have a line comment style for \(syntaxMode.label).")
+            return
+        }
+
+        applyLineEdit("Toggled line comment") { text, selection, _ in
+            EditorTextOperations.toggleLineComment(text: text, selection: selection, token: token)
+        }
+    }
+
+    func selectLine() {
+        let tab = activeTab
+        let range = EditorTextOperations.selectedLineContentsRange(
+            text: tab.text,
+            selection: activeSelectionRange(for: tab)
+        )
+        requestSelection(range, for: tab.id)
+        statusText = "Selected line"
+    }
+
+    func showGoToLine() {
+        showingGoToLine = true
+        statusText = "Go to line"
+    }
+
+    func goToLine(_ lineNumber: Int) {
+        let tab = activeTab
+        let range = EditorTextOperations.lineStartRange(text: tab.text, lineNumber: lineNumber)
+        requestSelection(range, for: tab.id)
+        statusText = "Moved to line \(max(1, lineNumber))"
+    }
+
+    func revealActiveFileInFinder() {
+        guard let fileURL = activeTab.fileURL else {
+            present(message: "Save this tab before revealing it in Finder.")
+            return
+        }
+
+        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        statusText = "Revealed \(fileURL.lastPathComponent)"
     }
 
     func insertCurrentDateTime() {
@@ -1267,6 +1351,31 @@ final class TextDocumentStore: ObservableObject {
         return DocumentStats(tab: tab, selectedText: selectedText)
     }
 
+    private func activeSelectionRange(for tab: TextDocumentTab) -> NSRange {
+        let textLength = (tab.text as NSString).length
+        let range = selectionRangeByTabID[tab.id] ?? NSRange(location: 0, length: 0)
+        let location = min(max(range.location, 0), textLength)
+        let length = min(max(range.length, 0), textLength - location)
+        return NSRange(location: location, length: length)
+    }
+
+    private func requestSelection(_ range: NSRange, for tabID: UUID) {
+        guard let tab = tabs.first(where: { $0.id == tabID }) else { return }
+
+        let textLength = (tab.text as NSString).length
+        let location = min(max(range.location, 0), textLength)
+        let length = min(max(range.length, 0), textLength - location)
+        let clampedRange = NSRange(location: location, length: length)
+
+        selectionRangeByTabID[tabID] = clampedRange
+        if clampedRange.length > 0 {
+            selectedTextByTabID[tabID] = (tab.text as NSString).substring(with: clampedRange)
+        } else {
+            selectedTextByTabID[tabID] = ""
+        }
+        selectionRequest = TextSelectionRequest(tabID: tabID, range: clampedRange)
+    }
+
     private func cursorPosition(for id: UUID) -> DocumentCursorPosition {
         let tab = tabs.first(where: { $0.id == id }) ?? activeTab
         let nsText = tab.text as NSString
@@ -1309,6 +1418,52 @@ final class TextDocumentStore: ObservableObject {
             tab.preferredLineEnding = TextLineEnding.detect(in: tab.text, fallback: tab.preferredLineEnding)
         }
         statusText = status
+    }
+
+    private func applyLineEdit(
+        _ status: String,
+        operation: (String, NSRange, TextLineEnding) -> EditorTextOperationResult
+    ) {
+        let tab = activeTab
+        let result = operation(tab.text, activeSelectionRange(for: tab), tab.preferredLineEnding)
+        applyLineEditResult(result, tabID: tab.id, status: status)
+    }
+
+    private func applyOptionalLineEdit(
+        _ status: String,
+        emptyStatus: String,
+        operation: (String, NSRange, TextLineEnding) -> EditorTextOperationResult?
+    ) {
+        let tab = activeTab
+        guard let result = operation(tab.text, activeSelectionRange(for: tab), tab.preferredLineEnding) else {
+            statusText = emptyStatus
+            return
+        }
+
+        applyLineEditResult(result, tabID: tab.id, status: status)
+    }
+
+    private func applyLineEditResult(_ result: EditorTextOperationResult, tabID: UUID, status: String) {
+        mutateTab(tabID) { tab in
+            tab.text = result.text
+            tab.isEdited = true
+            tab.preferredLineEnding = TextLineEnding.detect(in: result.text, fallback: tab.preferredLineEnding)
+        }
+        requestSelection(result.selectionRange, for: tabID)
+        statusText = status
+    }
+
+    private func lineCommentToken(for syntaxMode: SyntaxHighlightMode) -> String? {
+        switch syntaxMode {
+        case .swift, .javascript, .java, .cFamily, .go, .rust:
+            return "//"
+        case .python, .ruby, .shell, .yaml, .toml:
+            return "#"
+        case .sql:
+            return "--"
+        case .automatic, .plainText, .json, .markdown, .html, .css:
+            return nil
+        }
     }
 
     private func fileErrorMessage(for error: Error, action: String) -> String {
@@ -1564,6 +1719,12 @@ struct DocumentFileInfo {
 struct DocumentCursorPosition: Equatable {
     let line: Int
     let column: Int
+}
+
+struct TextSelectionRequest: Equatable {
+    let id = UUID()
+    let tabID: UUID
+    let range: NSRange
 }
 
 struct QuickOpenItem: Identifiable, Equatable {
