@@ -106,6 +106,10 @@ swift build
 
 That creates `TextPort.app` in this folder.
 
+## Release Builds
+
+See [RELEASE.md](RELEASE.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

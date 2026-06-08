@@ -29,6 +29,7 @@ final class TextDocumentStore: ObservableObject {
     @Published var showingHelpGuide = false
     @Published var showingCustomSyntaxManager = false
     @Published var fileImportProgress: FileImportProgress?
+    @Published var sessionRecoveryNotice: SessionRecoveryNotice?
     @Published var helpGuideSection: HelpGuideSection = .about
 
     private let preferences = AppPreferences.shared
@@ -46,6 +47,7 @@ final class TextDocumentStore: ObservableObject {
                 ? restoredSession.selectedTabID
                 : restoredSession.tabs[0].id
             statusText = "Restored previous session"
+            sessionRecoveryNotice = SessionRecoveryNotice(tabCount: restoredSession.tabs.count)
         } else {
             let firstTab = TextDocumentTab(
                 textEncoding: preferences.defaultEncoding,
@@ -53,6 +55,7 @@ final class TextDocumentStore: ObservableObject {
             )
             tabs = [firstTab]
             selectedTabID = firstTab.id
+            sessionRecoveryNotice = nil
         }
 
         startFileChangeMonitoring()
@@ -386,6 +389,10 @@ final class TextDocumentStore: ObservableObject {
         helpGuideSection = section
         showingHelpGuide = true
         statusText = "TextPort help"
+    }
+
+    func dismissSessionRecoveryNotice() {
+        sessionRecoveryNotice = nil
     }
 
     func openQuickOpenItem(_ item: QuickOpenItem) {
@@ -748,7 +755,16 @@ final class TextDocumentStore: ObservableObject {
             saveDocument()
         }
 
-        guard !activeTab.isEdited, let fileURL = activeTab.fileURL else { return }
+        guard !activeTab.isEdited else {
+            present(message: "TextPort could not run this file because it still has unsaved changes. Save it first, then run it again.")
+            return
+        }
+
+        guard let fileURL = activeTab.fileURL else {
+            present(message: "Save this file before running it. TextPort runs code from a real file location so relative paths work predictably.")
+            return
+        }
+
         project.runFile(at: fileURL)
     }
 
@@ -1129,7 +1145,7 @@ final class TextDocumentStore: ObservableObject {
     }
 
     private func present(_ error: Error, action: String) {
-        errorMessage = "TextPort could not \(action) this file. \(error.localizedDescription)"
+        errorMessage = fileErrorMessage(for: error, action: action)
         showingError = true
         statusText = "Action failed"
     }
@@ -1195,6 +1211,55 @@ final class TextDocumentStore: ObservableObject {
             tab.preferredLineEnding = TextLineEnding.detect(in: tab.text, fallback: tab.preferredLineEnding)
         }
         statusText = status
+    }
+
+    private func fileErrorMessage(for error: Error, action: String) -> String {
+        let detail = error.localizedDescription
+
+        switch action {
+        case "open":
+            return """
+            TextPort could not open this file.
+
+            It may be locked, damaged, binary, or in a format TextPort cannot convert yet.
+
+            Details: \(detail)
+            """
+        case "save", "save copy":
+            return """
+            TextPort could not save this file.
+
+            Check that the folder still exists, you have permission to write there, and there is enough disk space.
+
+            Details: \(detail)
+            """
+        case let exportAction where exportAction.hasPrefix("export"):
+            return """
+            TextPort could not create this export.
+
+            The source tab is still unchanged. Try a different destination or export format.
+
+            Details: \(detail)
+            """
+        case let shareAction where shareAction.hasPrefix("share"):
+            return """
+            TextPort could not prepare this share item.
+
+            The original file was not changed.
+
+            Details: \(detail)
+            """
+        case let publishAction where publishAction.contains("Gist"):
+            return """
+            TextPort could not publish this Gist.
+
+            Make sure GitHub tools are enabled and the GitHub CLI is installed and signed in.
+
+            Details: \(detail)
+            """
+        default:
+            return "TextPort could not \(action) this file. \(detail)"
+        }
     }
 
     private func startFileChangeMonitoring() {
@@ -1404,6 +1469,19 @@ struct FileImportProgress: Identifiable, Equatable {
             title = "Opening File"
             detail = "TextPort is preparing the file."
         }
+    }
+}
+
+struct SessionRecoveryNotice: Equatable {
+    let tabCount: Int
+
+    var title: String {
+        "Previous Session Restored"
+    }
+
+    var message: String {
+        let tabText = tabCount == 1 ? "1 tab" : "\(tabCount) tabs"
+        return "\(tabText) reopened. Unsaved drafts stay local until you save or close them."
     }
 }
 

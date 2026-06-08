@@ -344,7 +344,7 @@ final class ProjectStore: ObservableObject {
     func stopTask() {
         guard taskRunState.isRunning else { return }
         taskRunner.stop()
-        appendTaskOutput("\nStopped.\n")
+        appendTaskOutput("\nStop requested. The process may report its final exit code below.\n")
     }
 
     func createFile() -> URL? {
@@ -420,6 +420,7 @@ final class ProjectStore: ObservableObject {
 
     func moveSelectedItemToTrash() -> URL? {
         guard let selectedFileURL else { return nil }
+        guard confirmMoveToTrash(selectedFileURL) else { return nil }
 
         do {
             var resultingURL: NSURL?
@@ -471,7 +472,12 @@ final class ProjectStore: ObservableObject {
         }
         bottomPanelMode = .output
         isBottomPanelVisible = true
-        taskOutput = "$ \(task.command)\n"
+        let workingDirectory = projectRootURL.appendingPathComponent(task.workingDirectory, isDirectory: true)
+        taskOutput = """
+        $ \(task.command)
+        Working directory: \(workingDirectory.standardizedFileURL.path)
+
+        """
         taskRunState = .running(task)
 
         taskRunner.run(
@@ -485,8 +491,9 @@ final class ProjectStore: ObservableObject {
                 self?.appendTaskOutput("\nExited with code \(exitCode).\n")
             },
             failure: { [weak self] message in
-                self?.taskRunState = .failed(message: message)
-                self?.appendTaskOutput("\n\(message)\n")
+                let failureMessage = "Could not start \(task.name)"
+                self?.taskRunState = .failed(message: failureMessage)
+                self?.appendTaskOutput("\n\(failureMessage). Check the command and working directory.\n\(message)\n")
             }
         )
     }
@@ -571,8 +578,29 @@ final class ProjectStore: ObservableObject {
         return name
     }
 
+    private func confirmMoveToTrash(_ url: URL) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Move \(url.lastPathComponent) to Trash?"
+        alert.informativeText = "TextPort will ask macOS to move this item to Trash. Open tabs from this item will become unsaved tabs so you do not lose their text."
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private func present(_ error: Error, action: String) {
-        present(message: "TextPort could not \(action) this project item. \(error.localizedDescription)")
+        let detail = error.localizedDescription
+
+        switch action {
+        case "open zip project":
+            present(message: "TextPort could not open this zip project. It may be damaged, password-protected, or contain a folder layout TextPort cannot read yet. Details: \(detail)")
+        case "share project":
+            present(message: "TextPort could not prepare this project bundle. The original project was not changed. Details: \(detail)")
+        case let githubAction where githubAction.contains("GitHub"):
+            present(message: "TextPort could not \(githubAction). Check that this project has a GitHub remote and that GitHub tools are enabled. Details: \(detail)")
+        default:
+            present(message: "TextPort could not \(action) this project item. Details: \(detail)")
+        }
     }
 
     private func present(message: String) {

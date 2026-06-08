@@ -128,7 +128,17 @@ private struct HelpGuideDetail: View {
                     "Current Build",
                     items: [
                         appVersionText,
-                        "Source files save as editable text. Exports create generated files."
+                        "Source files save as editable text. Exports create generated files.",
+                        "Release builds should be packaged, signed, checked with --verify, and published with matching release notes."
+                    ]
+                )
+
+                helpSection(
+                    "Trust Model",
+                    items: [
+                        "TextPort works locally and does not require an account.",
+                        "Sharing, GitHub, publishing, project tasks, and runnable code stay optional.",
+                        "Project tasks and runnable files execute local shell commands, so use them with projects you trust."
                     ]
                 )
 
@@ -184,7 +194,8 @@ private struct HelpGuideDetail: View {
                     items: [
                         "PDF and Word files open as cleaned body text in unsaved text tabs.",
                         "PowerPoint opens as extracted slide text.",
-                        "Excel workbooks open as one or more unsaved CSV tabs."
+                        "Excel workbooks open as one or more unsaved CSV tabs.",
+                        "Original imported files are not modified."
                     ]
                 )
 
@@ -230,7 +241,8 @@ private struct HelpGuideDetail: View {
                     items: [
                         "Saved Swift, Python, JavaScript, shell, Ruby, and Go files can run from the smart toolbar or Command Palette.",
                         "Edited files save first, then run from their file location.",
-                        "Output streams into the bottom panel, with a Stop action while the command is running."
+                        "Output streams into the bottom panel, with a Stop action while the command is running.",
+                        "File runs execute local commands. Only run files you trust."
                     ]
                 )
 

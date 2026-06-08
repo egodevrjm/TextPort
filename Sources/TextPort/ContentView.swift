@@ -213,6 +213,14 @@ struct ContentView: View {
         VStack(spacing: 0) {
             tabStrip
 
+            if let notice = document.sessionRecoveryNotice {
+                SessionRecoveryBanner(
+                    notice: notice,
+                    openGuide: { document.showHelpGuide(section: .basics) },
+                    dismiss: { document.dismissSessionRecoveryNotice() }
+                )
+            }
+
             editor
 
             statusBar
@@ -425,6 +433,44 @@ private struct StartSurface: View {
             .buttonStyle(.bordered)
         }
         .padding(28)
+    }
+}
+
+private struct SessionRecoveryBanner: View {
+    let notice: SessionRecoveryNotice
+    let openGuide: () -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notice.title)
+                    .font(.caption.weight(.semibold))
+
+                Text(notice.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Guide", action: openGuide)
+                .buttonStyle(.borderless)
+
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.borderless)
+            .help("Dismiss")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.bar)
     }
 }
 
