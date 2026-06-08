@@ -219,6 +219,10 @@ final class TextDocumentStore: ObservableObject {
     }
 
     func updateSelection(for id: UUID, selectedText: String, range: NSRange) {
+        let currentText = selectedTextByTabID[id] ?? ""
+        let currentRange = selectionRangeByTabID[id] ?? NSRange(location: 0, length: 0)
+        guard currentText != selectedText || currentRange != range else { return }
+
         objectWillChange.send()
         selectedTextByTabID[id] = selectedText
         selectionRangeByTabID[id] = range

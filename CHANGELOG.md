@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed a startup hang caused by repeated unchanged editor selection updates.
 - Added editor quality pass 2: Go to Line, select/duplicate/move/delete/join lines, toggle line comments, and Reveal in Finder.
 - Added editor quality upgrades: cursor/selection status, File Info, richer Markdown preview, and tab-management commands.
 - Added a restored-session notice, safer Trash confirmation, clearer run/import/share failure messages, and release checklist docs.
