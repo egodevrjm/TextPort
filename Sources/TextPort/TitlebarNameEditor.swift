@@ -63,14 +63,15 @@ struct WindowTitlebarAccessor: NSViewRepresentable {
             titleField.lineBreakMode = .byTruncatingMiddle
             titleField.maximumNumberOfLines = 1
             titleField.toolTip = "Click to rename the current file."
+            titleField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
             titlebarView.addSubview(titleField)
 
             NSLayoutConstraint.activate([
                 titleField.centerXAnchor.constraint(equalTo: titlebarView.centerXAnchor),
                 titleField.centerYAnchor.constraint(equalTo: titlebarView.centerYAnchor, constant: 1),
-                titleField.widthAnchor.constraint(lessThanOrEqualToConstant: 280),
-                titleField.widthAnchor.constraint(greaterThanOrEqualToConstant: 90),
+                titleField.widthAnchor.constraint(equalToConstant: 280),
                 titleField.heightAnchor.constraint(equalToConstant: 24)
             ])
 
@@ -100,10 +101,7 @@ struct WindowTitlebarAccessor: NSViewRepresentable {
             isEditingTitle = true
         }
 
-        func controlTextDidChange(_ notification: Notification) {
-            guard let titleField, let document else { return }
-            document.updateActiveDisplayName(titleField.stringValue)
-        }
+        func controlTextDidChange(_ notification: Notification) {}
 
         func controlTextDidEndEditing(_ notification: Notification) {
             commitTitleEdit()
@@ -112,6 +110,9 @@ struct WindowTitlebarAccessor: NSViewRepresentable {
         @objc
         private func commitTitleEdit() {
             guard let document else { return }
+            if let titleField {
+                document.updateActiveDisplayName(titleField.stringValue)
+            }
             document.commitActiveFileNameChange()
             titleField?.stringValue = document.editableFileName
             isEditingTitle = false

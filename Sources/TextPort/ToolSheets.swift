@@ -165,7 +165,7 @@ struct CommandPaletteView: View {
     @State private var query = ""
 
     private var commands: [CommandPaletteItem] {
-        [
+        var items = [
             CommandPaletteItem("Open File", "File") { document.openDocument() },
             CommandPaletteItem("Open Project or Zip", "Project") { project.openProjectPanel(); document.openFiles(at: project.consumeRestoredOpenTabURLs()) },
             CommandPaletteItem("Open Quickly", "File") { document.showQuickOpen() },
@@ -178,6 +178,7 @@ struct CommandPaletteView: View {
             CommandPaletteItem("Minify Document", "Text") { document.minifyDocument() },
             CommandPaletteItem("Document Stats", "Tools") { document.showDocumentStats() },
             CommandPaletteItem("Visualize JSON", "Tools", isEnabled: document.activeDocumentCanVisualizeJSON) { document.showJSONVisualizer() },
+            CommandPaletteItem("Custom Syntaxes", "Text") { document.showCustomSyntaxManager() },
             CommandPaletteItem("Save Copy As", "File") { document.showingSaveCopySheet = true },
             CommandPaletteItem("Export", "File") { document.showingExportSheet = true },
             CommandPaletteItem(project.isSidebarVisible ? "Hide Project Sidebar" : "Show Project Sidebar", "View") { project.toggleSidebar() },
@@ -189,6 +190,37 @@ struct CommandPaletteView: View {
             CommandPaletteItem("Run Selected Task", "Project", isEnabled: project.hasProject && !project.taskRunState.isRunning) { project.runSelectedTask() },
             CommandPaletteItem("Stop Task", "Project", isEnabled: project.taskRunState.isRunning) { project.stopTask() }
         ]
+
+        if preferences.enableSharingTools {
+            items.append(contentsOf: [
+                CommandPaletteItem("Share Current Tab", "Share") { document.shareCurrentTab() },
+                CommandPaletteItem("Share Selected Text", "Share") { document.shareSelectedText() },
+                CommandPaletteItem("Share Rendered Output", "Share") { document.shareRenderedOutput() },
+                CommandPaletteItem("Share Open Tabs Bundle", "Share") { document.shareOpenTabsBundle() },
+                CommandPaletteItem("Share Project Bundle", "Share", isEnabled: project.hasProject) { project.shareProjectBundle() }
+            ])
+        }
+
+        if preferences.enableSharingTools && preferences.enableGitHubTools {
+            items.append(contentsOf: [
+                CommandPaletteItem("Open Repository on GitHub", "GitHub", isEnabled: project.hasProject) { project.openGitHubRepository() },
+                CommandPaletteItem("Copy GitHub Repository Link", "GitHub", isEnabled: project.hasProject) { project.copyGitHubRepositoryURL() },
+                CommandPaletteItem("Copy GitHub File Link", "GitHub", isEnabled: project.hasProject && document.activeTab.fileURL != nil) {
+                    project.copyGitHubLink(for: document.activeTab.fileURL)
+                },
+                CommandPaletteItem("Copy Markdown GitHub File Link", "GitHub", isEnabled: project.hasProject && document.activeTab.fileURL != nil) {
+                    project.copyGitHubLink(for: document.activeTab.fileURL, markdown: true)
+                }
+            ])
+        }
+
+        if preferences.enableSharingTools && preferences.enableGitHubTools && preferences.enablePublishingActions {
+            items.append(CommandPaletteItem("Publish Current Tab as Secret Gist", "GitHub") {
+                document.publishCurrentTabAsSecretGist()
+            })
+        }
+
+        return items
     }
 
     private var filteredCommands: [CommandPaletteItem] {

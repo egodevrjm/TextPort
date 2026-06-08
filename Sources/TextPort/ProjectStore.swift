@@ -290,6 +290,57 @@ final class ProjectStore: ObservableObject {
         gitStatusByPath[url.standardizedFileURL.path]
     }
 
+    func shareProjectBundle() {
+        guard let currentProject else { return }
+
+        do {
+            let bundleURL = try ShareItemBuilder.projectBundle(rootURL: currentProject.rootURL)
+            try SharingService.share(items: [bundleURL])
+        } catch {
+            present(error, action: "share project")
+        }
+    }
+
+    func openGitHubRepository() {
+        guard let currentProject else { return }
+
+        do {
+            try GitHubService.openRepository(rootURL: currentProject.rootURL)
+        } catch {
+            present(error, action: "open GitHub repository")
+        }
+    }
+
+    func copyGitHubRepositoryURL() {
+        guard let currentProject else { return }
+
+        do {
+            try GitHubService.copyRepositoryURL(rootURL: currentProject.rootURL)
+        } catch {
+            present(error, action: "copy GitHub repository link")
+        }
+    }
+
+    func copyGitHubLink(for url: URL?, markdown: Bool = false) {
+        guard let currentProject else { return }
+        let targetURL = url ?? selectedFileURL
+        guard let targetURL else {
+            present(message: "Select a project file before copying a GitHub file link.")
+            return
+        }
+
+        guard isInsideProject(targetURL), !Self.isDirectory(targetURL) else {
+            present(message: "Select a file inside the current project before copying a GitHub file link.")
+            return
+        }
+
+        do {
+            try GitHubService.copyFileLink(fileURL: targetURL, rootURL: currentProject.rootURL, markdown: markdown)
+        } catch {
+            present(error, action: "copy GitHub file link")
+        }
+    }
+
     func stopTask() {
         guard taskRunState.isRunning else { return }
         taskRunner.stop()

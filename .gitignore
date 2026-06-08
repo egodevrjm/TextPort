@@ -2,3 +2,21 @@
 .build/
 .swiftpm/
 TextPort.app/
+*.dSYM/
+*.xcarchive/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+
+# Local secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.mobileprovision
+
+# Temporary export/package outputs
+*.zip
+*.tar.gz

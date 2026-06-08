@@ -169,6 +169,15 @@ private struct HelpGuideDetail: View {
                     ]
                 )
 
+                helpSection(
+                    "Sharing",
+                    items: [
+                        "Sharing tools are off by default and can be enabled in Settings.",
+                        "When enabled, TextPort can share the current tab, selected text, rendered output, open tabs, or a project source bundle.",
+                        "GitHub tools can open or copy repository and file links for projects with GitHub remotes."
+                    ]
+                )
+
             case .imports:
                 helpSection(
                     "Documents",

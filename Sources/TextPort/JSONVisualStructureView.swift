@@ -943,7 +943,7 @@ enum JSONVisualHTMLExporter {
         return url
     }
 
-    private static func html(root: JSONPreviewValue, documentName: String) -> String {
+    static func html(root: JSONPreviewValue, documentName: String) -> String {
         let stats = root.stats(depth: 1)
 
         return """

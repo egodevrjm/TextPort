@@ -9,6 +9,7 @@ struct PlainTextEditorView: NSViewRepresentable {
     var showLineNumbers: Bool
     var wordWrap: Bool
     var syntaxMode: SyntaxHighlightMode
+    var customSyntaxDefinition: CustomSyntaxDefinition?
     var selectionChanged: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -46,7 +47,8 @@ struct PlainTextEditorView: NSViewRepresentable {
             fontSize: fontSize,
             showLineNumbers: showLineNumbers,
             wordWrap: wordWrap,
-            syntaxMode: syntaxMode
+            syntaxMode: syntaxMode,
+            customSyntaxDefinition: customSyntaxDefinition
         )
 
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -76,7 +78,8 @@ struct PlainTextEditorView: NSViewRepresentable {
             fontSize: fontSize,
             showLineNumbers: showLineNumbers,
             wordWrap: wordWrap,
-            syntaxMode: syntaxMode
+            syntaxMode: syntaxMode,
+            customSyntaxDefinition: customSyntaxDefinition
         )
     }
 
@@ -93,6 +96,7 @@ struct PlainTextEditorView: NSViewRepresentable {
         private var lineNumberRuler: LineNumberRulerView?
         private var isApplyingSyntax = false
         private var currentSyntaxMode: SyntaxHighlightMode = .plainText
+        private var currentCustomSyntaxDefinition: CustomSyntaxDefinition?
 
         init(text: Binding<String>, selectionChanged: @escaping (String) -> Void) {
             self.text = text
@@ -105,21 +109,27 @@ struct PlainTextEditorView: NSViewRepresentable {
             fontSize: Double,
             showLineNumbers: Bool,
             wordWrap: Bool,
-            syntaxMode: SyntaxHighlightMode
+            syntaxMode: SyntaxHighlightMode,
+            customSyntaxDefinition: CustomSyntaxDefinition?
         ) {
             textView.font = .monospacedSystemFont(ofSize: CGFloat(fontSize), weight: .regular)
             textView.typingAttributes[.font] = textView.font
             configureWrapping(textView: textView, scrollView: scrollView, wordWrap: wordWrap)
             configureLineNumbers(textView: textView, scrollView: scrollView, showLineNumbers: showLineNumbers)
             currentSyntaxMode = syntaxMode
-            applySyntax(to: textView, syntaxMode: syntaxMode)
+            currentCustomSyntaxDefinition = customSyntaxDefinition
+            applySyntax(to: textView, syntaxMode: syntaxMode, customSyntaxDefinition: customSyntaxDefinition)
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
             text.wrappedValue = textView.string
             lineNumberRuler?.needsDisplay = true
-            applySyntax(to: textView, syntaxMode: currentSyntaxMode)
+            applySyntax(
+                to: textView,
+                syntaxMode: currentSyntaxMode,
+                customSyntaxDefinition: currentCustomSyntaxDefinition
+            )
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -182,11 +192,19 @@ struct PlainTextEditorView: NSViewRepresentable {
             }
         }
 
-        private func applySyntax(to textView: NSTextView, syntaxMode: SyntaxHighlightMode) {
+        private func applySyntax(
+            to textView: NSTextView,
+            syntaxMode: SyntaxHighlightMode,
+            customSyntaxDefinition: CustomSyntaxDefinition?
+        ) {
             guard !isApplyingSyntax else { return }
             isApplyingSyntax = true
             let selectedRanges = textView.selectedRanges
-            SyntaxHighlighter.apply(to: textView, mode: syntaxMode)
+            SyntaxHighlighter.apply(
+                to: textView,
+                mode: syntaxMode,
+                customSyntaxDefinition: customSyntaxDefinition
+            )
             textView.selectedRanges = selectedRanges
             isApplyingSyntax = false
         }

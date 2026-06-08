@@ -118,6 +118,67 @@ struct TextPortApp: App {
                     document.printDocument()
                 }
                 .keyboardShortcut("p", modifiers: .command)
+
+                if preferences.enableSharingTools {
+                    Divider()
+
+                    Menu("Share") {
+                        Button("Share Current Tab") {
+                            document.shareCurrentTab()
+                        }
+                        .keyboardShortcut("u", modifiers: [.command, .shift])
+
+                        Button("Share Selected Text") {
+                            document.shareSelectedText()
+                        }
+
+                        Button("Share Rendered Output") {
+                            document.shareRenderedOutput()
+                        }
+
+                        Button("Share Open Tabs Bundle") {
+                            document.shareOpenTabsBundle()
+                        }
+
+                        if project.hasProject {
+                            Button("Share Project Bundle") {
+                                project.shareProjectBundle()
+                            }
+                        }
+
+                        if preferences.enableGitHubTools {
+                            Divider()
+
+                            Button("Open Repository on GitHub") {
+                                project.openGitHubRepository()
+                            }
+                            .disabled(!project.hasProject)
+
+                            Button("Copy GitHub Repository Link") {
+                                project.copyGitHubRepositoryURL()
+                            }
+                            .disabled(!project.hasProject)
+
+                            Button("Copy GitHub File Link") {
+                                project.copyGitHubLink(for: document.activeTab.fileURL)
+                            }
+                            .disabled(!project.hasProject || document.activeTab.fileURL == nil)
+
+                            Button("Copy Markdown GitHub File Link") {
+                                project.copyGitHubLink(for: document.activeTab.fileURL, markdown: true)
+                            }
+                            .disabled(!project.hasProject || document.activeTab.fileURL == nil)
+                        }
+
+                        if preferences.enableGitHubTools && preferences.enablePublishingActions {
+                            Divider()
+
+                            Button("Publish Current Tab as Secret Gist") {
+                                document.publishCurrentTabAsSecretGist()
+                            }
+                        }
+                    }
+                }
             }
 
             CommandGroup(after: .textEditing) {
@@ -290,6 +351,24 @@ struct TextPortApp: App {
                         Button(mode.label) {
                             document.setActiveSyntaxMode(mode)
                         }
+                    }
+
+                    if !preferences.customSyntaxDefinitions.isEmpty {
+                        Divider()
+
+                        Menu("Custom") {
+                            ForEach(preferences.customSyntaxDefinitions) { definition in
+                                Button(definition.displayName) {
+                                    document.setActiveCustomSyntaxDefinition(definition.id)
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Custom Syntaxes...") {
+                        document.showCustomSyntaxManager()
                     }
                 }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-struct ImportedSpreadsheetSheet {
+struct ImportedSpreadsheetSheet: Sendable {
     let name: String
     let csvText: String
 }
@@ -20,6 +20,10 @@ enum OfficeImportService {
 
     static func isExtractedTextDocument(_ url: URL) -> Bool {
         ["docx", "pdf", "pptx"].contains(url.pathExtension.lowercased())
+    }
+
+    static func requiresTextExtraction(_ url: URL) -> Bool {
+        isExtractedTextDocument(url)
     }
 
     static func extractedDisplayName(for url: URL) -> String {

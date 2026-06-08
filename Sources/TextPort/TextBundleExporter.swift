@@ -13,6 +13,16 @@ enum TextBundleExporter {
 
         guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
 
+        try writeBundle(tabs: tabs, to: destinationURL)
+    }
+
+    static func temporaryBundle(tabs: [TextDocumentTab]) throws -> URL {
+        let destinationURL = try ShareItemBuilder.temporaryURL(fileName: "TextPort Tabs.zip")
+        try writeBundle(tabs: tabs, to: destinationURL)
+        return destinationURL
+    }
+
+    private static func writeBundle(tabs: [TextDocumentTab], to destinationURL: URL) throws {
         let workURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextPortExport-\(UUID().uuidString)", isDirectory: true)
         let sourceURL = workURL.appendingPathComponent("TextPort Export", isDirectory: true)
@@ -36,19 +46,7 @@ enum TextBundleExporter {
             }
         }
 
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = ["-c", "-k", "--keepParent", sourceURL.path, destinationURL.path]
-        try process.run()
-        process.waitUntilExit()
-
-        if process.terminationStatus != 0 {
-            throw TextBundleExportError.zipFailed
-        }
+        try ZipArchiveWriter.zip(sourceURL: sourceURL, destinationURL: destinationURL)
     }
 
     private static func uniqueFileName(for tab: TextDocumentTab, existingNames: Set<String>) -> String {

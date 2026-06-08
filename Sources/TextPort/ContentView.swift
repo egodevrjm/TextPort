@@ -12,7 +12,7 @@ struct ContentView: View {
     var body: some View {
         rootLayout
         .toolbar {
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     document.openDocument()
                 } label: {
@@ -50,6 +50,15 @@ struct ContentView: View {
                         Label("Visualize JSON", systemImage: "chart.bar.doc.horizontal")
                     }
                     .help("Visualize JSON")
+                }
+
+                if preferences.enableSharingTools {
+                    Button {
+                        document.shareCurrentTab()
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .help("Share Current Tab")
                 }
 
                 if project.hasProject {
@@ -140,6 +149,14 @@ struct ContentView: View {
         .sheet(isPresented: $document.showingHelpGuide) {
             HelpGuideView()
                 .environmentObject(document)
+        }
+        .sheet(isPresented: $document.showingCustomSyntaxManager) {
+            CustomSyntaxManagerView()
+                .environmentObject(document)
+                .environmentObject(preferences)
+        }
+        .sheet(item: $document.fileImportProgress) { progress in
+            FileImportProgressView(progress: progress)
         }
         .sheet(isPresented: $project.showingTaskManager) {
             TaskManagerView()
@@ -262,6 +279,7 @@ struct ContentView: View {
             }
 
             let syntaxMode = document.effectiveSyntaxMode(for: tab.id)
+            let customSyntax = document.effectiveCustomSyntaxDefinition(for: tab.id)
             if preferences.renderPreview, let previewKind = RenderedPreviewKind.detect(fileName: tab.fileDisplayName, syntaxMode: syntaxMode) {
                 RenderedPreviewView(tab: tab, kind: previewKind)
             } else {
@@ -275,6 +293,7 @@ struct ContentView: View {
                     showLineNumbers: preferences.showLineNumbers,
                     wordWrap: preferences.wordWrap,
                     syntaxMode: syntaxMode,
+                    customSyntaxDefinition: customSyntax,
                     selectionChanged: { selectedText in
                         document.updateSelectedText(for: tab.id, selectedText: selectedText)
                     }

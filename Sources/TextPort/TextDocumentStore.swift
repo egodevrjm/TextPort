@@ -27,12 +27,15 @@ final class TextDocumentStore: ObservableObject {
     @Published var showingDocumentOutline = false
     @Published var showingTemplateChooser = false
     @Published var showingHelpGuide = false
+    @Published var showingCustomSyntaxManager = false
+    @Published var fileImportProgress: FileImportProgress?
     @Published var helpGuideSection: HelpGuideSection = .about
 
     private let preferences = AppPreferences.shared
     private var sessionSaveTask: Task<Void, Never>?
     private var fileChangeTimer: Timer?
     private var selectedTextByTabID: [UUID: String] = [:]
+    private var queuedProcessedFileURLs: [URL] = []
 
     init() {
         recentFiles = RecentFileStore.load()
@@ -81,7 +84,15 @@ final class TextDocumentStore: ObservableObject {
     }
 
     var detailText: String {
-        "\(activeTab.textEncoding.label) - \(activeTab.preferredLineEnding.label)"
+        "\(activeTab.textEncoding.label) - \(activeTab.preferredLineEnding.label) - \(activeSyntaxLabel)"
+    }
+
+    var activeSyntaxLabel: String {
+        if let definition = effectiveCustomSyntaxDefinition(for: selectedTabID) {
+            return definition.displayName
+        }
+
+        return effectiveSyntaxMode(for: selectedTabID).label
     }
 
     var lineCountText: String {
@@ -175,6 +186,22 @@ final class TextDocumentStore: ObservableObject {
         return SyntaxHighlightMode.detect(fileName: tab.fileDisplayName, text: tab.text)
     }
 
+    func effectiveCustomSyntaxDefinition(for id: UUID) -> CustomSyntaxDefinition? {
+        guard let tab = tabs.first(where: { $0.id == id }) else { return nil }
+
+        if let pinnedDefinition = preferences.customSyntaxDefinition(id: tab.customSyntaxID) {
+            return pinnedDefinition
+        }
+
+        guard tab.syntaxMode == .automatic,
+              SyntaxHighlightMode.detect(fileName: tab.fileDisplayName, text: tab.text) == .plainText
+        else {
+            return nil
+        }
+
+        return preferences.matchingCustomSyntax(fileName: tab.fileDisplayName, text: tab.text)
+    }
+
     func updateActiveDisplayName(_ displayName: String) {
         mutateActiveTab { tab in
             tab.displayName = displayName
@@ -213,8 +240,22 @@ final class TextDocumentStore: ObservableObject {
     func setActiveSyntaxMode(_ mode: SyntaxHighlightMode) {
         mutateActiveTab { tab in
             tab.syntaxMode = mode
+            tab.customSyntaxID = nil
         }
         statusText = "Syntax mode set to \(mode.label)"
+    }
+
+    func setActiveCustomSyntaxDefinition(_ definitionID: UUID) {
+        guard let definition = preferences.customSyntaxDefinition(id: definitionID) else { return }
+        mutateActiveTab { tab in
+            tab.syntaxMode = .automatic
+            tab.customSyntaxID = definition.id
+        }
+        statusText = "Syntax mode set to \(definition.displayName)"
+    }
+
+    func showCustomSyntaxManager() {
+        showingCustomSyntaxManager = true
     }
 
     func showJSONVisualizer() {
@@ -621,6 +662,83 @@ final class TextDocumentStore: ObservableObject {
         }
     }
 
+    func shareCurrentTab() {
+        do {
+            try SharingService.share(items: [try ShareItemBuilder.sourceFile(for: activeTab)])
+            statusText = "Sharing \(activeTab.fileDisplayName)"
+        } catch {
+            present(error, action: "share")
+        }
+    }
+
+    func shareSelectedText() {
+        let selectedText = selectedTextByTabID[selectedTabID] ?? ""
+        guard !selectedText.isEmpty else {
+            present(message: "Select text before sharing selected text.")
+            return
+        }
+
+        do {
+            try SharingService.share(items: [selectedText])
+            statusText = "Sharing selected text"
+        } catch {
+            present(error, action: "share selected text")
+        }
+    }
+
+    func shareRenderedOutput() {
+        do {
+            let url = try ShareItemBuilder.renderedOutput(
+                for: activeTab,
+                mode: effectiveSyntaxMode(for: selectedTabID),
+                fontSize: preferences.fontSize
+            )
+            try SharingService.share(items: [url])
+            statusText = "Sharing \(url.lastPathComponent)"
+        } catch {
+            present(error, action: "share rendered output")
+        }
+    }
+
+    func shareOpenTabsBundle() {
+        do {
+            let url = try TextBundleExporter.temporaryBundle(tabs: tabs)
+            try SharingService.share(items: [url])
+            statusText = "Sharing open tabs bundle"
+        } catch {
+            present(error, action: "share tabs bundle")
+        }
+    }
+
+    func publishCurrentTabAsSecretGist() {
+        let tab = activeTab
+
+        do {
+            let sourceURL = try ShareItemBuilder.sourceFile(for: tab)
+            let fileName = tab.fileDisplayName
+            statusText = "Publishing Gist..."
+
+            Task {
+                let result = await Task.detached(priority: .userInitiated) {
+                    Result {
+                        try GitHubService.createSecretGist(fileURL: sourceURL, fileName: fileName)
+                    }
+                }.value
+
+                switch result {
+                case .success(let gistURL):
+                    GitHubService.copyToPasteboard(gistURL.absoluteString)
+                    NSWorkspace.shared.open(gistURL)
+                    statusText = "Published Gist and copied link"
+                case .failure(let error):
+                    present(error, action: "publish Gist")
+                }
+            }
+        } catch {
+            present(error, action: "prepare Gist")
+        }
+    }
+
     func printDocument() {
         PrintService.print(tab: activeTab, fontSize: preferences.fontSize)
     }
@@ -731,71 +849,127 @@ final class TextDocumentStore: ObservableObject {
         }
 
         if OfficeImportService.isSpreadsheet(url) {
-            loadSpreadsheet(at: url)
+            processFileWithProgress(at: url)
+            return
+        }
+
+        if OfficeImportService.requiresTextExtraction(url) {
+            processFileWithProgress(at: url)
             return
         }
 
         do {
             let loadedFile = try TextFileLoader.load(url: url)
-            let isExtractedText = OfficeImportService.isExtractedTextDocument(url)
-            let loadedTab = TextDocumentTab(
-                text: loadedFile.text,
-                fileURL: isExtractedText ? nil : url,
-                displayName: isExtractedText ? OfficeImportService.extractedDisplayName(for: url) : url.lastPathComponent,
-                isEdited: isExtractedText,
-                textEncoding: loadedFile.textEncoding,
-                preferredLineEnding: loadedFile.lineEnding,
-                lastKnownModificationDate: isExtractedText ? nil : fileModificationDate(for: url)
-            )
-
-            if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
-                tabs[activeTabIndex] = loadedTab
-            } else {
-                tabs.append(loadedTab)
-            }
-
-            selectedTabID = loadedTab.id
-            addRecentFile(url)
-            statusText = isExtractedText ? OfficeImportService.extractedStatus(for: url) : "Opened \(url.lastPathComponent)"
-            scheduleSessionSave()
+            openLoadedTextFile(loadedFile, from: url)
         } catch {
             present(error, action: "open")
         }
     }
 
+    private func processFileWithProgress(at url: URL) {
+        guard fileImportProgress == nil else {
+            queuedProcessedFileURLs.append(url)
+            return
+        }
+
+        let progress = FileImportProgress(url: url)
+        fileImportProgress = progress
+        statusText = progress.title
+
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    try ProcessedFileImport.load(url: url)
+                }
+            }.value
+
+            self.finishProcessingFile(at: url, result: result)
+        }
+    }
+
+    private func finishProcessingFile(at url: URL, result: Result<ProcessedFileImport, Error>) {
+        fileImportProgress = nil
+
+        switch result {
+        case .success(.text(let loadedFile)):
+            openLoadedTextFile(loadedFile, from: url)
+        case .success(.spreadsheet(let sheets)):
+            do {
+                try openLoadedSpreadsheet(sheets, from: url)
+            } catch {
+                present(error, action: "open")
+            }
+        case .failure(let error):
+            present(error, action: "open")
+        }
+
+        if let nextURL = queuedProcessedFileURLs.first {
+            queuedProcessedFileURLs.removeFirst()
+            processFileWithProgress(at: nextURL)
+        }
+    }
+
+    private func openLoadedTextFile(_ loadedFile: LoadedTextFile, from url: URL) {
+        let isExtractedText = OfficeImportService.isExtractedTextDocument(url)
+        let loadedTab = TextDocumentTab(
+            text: loadedFile.text,
+            fileURL: isExtractedText ? nil : url,
+            displayName: isExtractedText ? OfficeImportService.extractedDisplayName(for: url) : url.lastPathComponent,
+            isEdited: isExtractedText,
+            textEncoding: loadedFile.textEncoding,
+            preferredLineEnding: loadedFile.lineEnding,
+            lastKnownModificationDate: isExtractedText ? nil : fileModificationDate(for: url)
+        )
+
+        if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
+            tabs[activeTabIndex] = loadedTab
+        } else {
+            tabs.append(loadedTab)
+        }
+
+        selectedTabID = loadedTab.id
+        addRecentFile(url)
+        statusText = isExtractedText ? OfficeImportService.extractedStatus(for: url) : "Opened \(url.lastPathComponent)"
+        scheduleSessionSave()
+    }
+
+    private func openLoadedSpreadsheet(_ sheets: [ImportedSpreadsheetSheet], from url: URL) throws {
+        let baseName = url.deletingPathExtension().lastPathComponent
+        let loadedTabs = sheets.map { sheet in
+            TextDocumentTab(
+                text: sheet.csvText,
+                fileURL: nil,
+                displayName: "\(baseName) - \(sheet.name).csv",
+                isEdited: true,
+                textEncoding: .utf8,
+                preferredLineEnding: .lf,
+                syntaxMode: .automatic
+            )
+        }
+
+        guard let firstTab = loadedTabs.first else {
+            throw OfficeImportError.emptyWorkbook
+        }
+
+        if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
+            tabs[activeTabIndex] = firstTab
+            tabs.append(contentsOf: loadedTabs.dropFirst())
+        } else {
+            tabs.append(contentsOf: loadedTabs)
+        }
+
+        selectedTabID = firstTab.id
+        addRecentFile(url)
+        statusText = loadedTabs.count == 1
+            ? "Converted \(url.lastPathComponent) to CSV"
+            : "Converted \(url.lastPathComponent) to \(loadedTabs.count) CSV tabs"
+        scheduleSessionSave()
+    }
+
     private func loadSpreadsheet(at url: URL) {
         do {
             let sheets = try OfficeImportService.loadSpreadsheet(url: url)
-            let baseName = url.deletingPathExtension().lastPathComponent
-            let loadedTabs = sheets.map { sheet in
-                TextDocumentTab(
-                    text: sheet.csvText,
-                    fileURL: nil,
-                    displayName: "\(baseName) - \(sheet.name).csv",
-                    isEdited: true,
-                    textEncoding: .utf8,
-                    preferredLineEnding: .lf,
-                    syntaxMode: .automatic
-                )
-            }
-
-            guard let firstTab = loadedTabs.first else {
-                throw OfficeImportError.emptyWorkbook
-            }
-
-            if preferences.reuseBlankTabWhenOpening && shouldReuseActiveBlankTab {
-                tabs[activeTabIndex] = firstTab
-                tabs.append(contentsOf: loadedTabs.dropFirst())
-            } else {
-                tabs.append(contentsOf: loadedTabs)
-            }
-
-            selectedTabID = firstTab.id
-            addRecentFile(url)
-            statusText = loadedTabs.count == 1
-                ? "Converted \(url.lastPathComponent) to CSV"
-                : "Converted \(url.lastPathComponent) to \(loadedTabs.count) CSV tabs"
-            scheduleSessionSave()
+            try openLoadedSpreadsheet(sheets, from: url)
         } catch {
             present(error, action: "open")
         }
@@ -1090,6 +1264,7 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
     var lastKnownModificationDate: Date?
     var lastExternalChangePromptDate: Date?
     var syntaxMode: SyntaxHighlightMode
+    var customSyntaxID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -1101,7 +1276,8 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         preferredLineEnding: TextLineEnding = .lf,
         lastKnownModificationDate: Date? = nil,
         lastExternalChangePromptDate: Date? = nil,
-        syntaxMode: SyntaxHighlightMode = .automatic
+        syntaxMode: SyntaxHighlightMode = .automatic,
+        customSyntaxID: UUID? = nil
     ) {
         self.id = id
         self.text = text
@@ -1113,6 +1289,7 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         self.lastKnownModificationDate = lastKnownModificationDate
         self.lastExternalChangePromptDate = lastExternalChangePromptDate
         self.syntaxMode = syntaxMode
+        self.customSyntaxID = customSyntaxID
     }
 
     var fileDisplayName: String {
@@ -1131,6 +1308,7 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         case lastKnownModificationDate
         case lastExternalChangePromptDate
         case syntaxMode
+        case customSyntaxID
     }
 
     init(from decoder: Decoder) throws {
@@ -1145,6 +1323,7 @@ struct TextDocumentTab: Identifiable, Equatable, Codable {
         lastKnownModificationDate = try container.decodeIfPresent(Date.self, forKey: .lastKnownModificationDate)
         lastExternalChangePromptDate = try container.decodeIfPresent(Date.self, forKey: .lastExternalChangePromptDate)
         syntaxMode = try container.decodeIfPresent(SyntaxHighlightMode.self, forKey: .syntaxMode) ?? .automatic
+        customSyntaxID = try container.decodeIfPresent(UUID.self, forKey: .customSyntaxID)
     }
 }
 
@@ -1197,6 +1376,48 @@ enum QuickOpenKind: Equatable {
     case openTab(UUID)
     case recentFile(URL)
     case projectFile(URL)
+}
+
+struct FileImportProgress: Identifiable, Equatable {
+    let id = UUID()
+    let fileName: String
+    let title: String
+    let detail: String
+
+    init(url: URL) {
+        fileName = url.lastPathComponent
+
+        switch url.pathExtension.lowercased() {
+        case "pdf":
+            title = "Extracting PDF Text"
+            detail = "TextPort is reading the pages and cleaning the extracted body text."
+        case "docx":
+            title = "Extracting Word Text"
+            detail = "TextPort is unpacking the document and collecting the main body text."
+        case "pptx":
+            title = "Extracting Slide Text"
+            detail = "TextPort is reading the slide deck and collecting visible slide text."
+        case "xlsx", "xlsm":
+            title = "Converting Workbook"
+            detail = "TextPort is converting workbook sheets into editable CSV tabs."
+        default:
+            title = "Opening File"
+            detail = "TextPort is preparing the file."
+        }
+    }
+}
+
+private enum ProcessedFileImport: Sendable {
+    case text(LoadedTextFile)
+    case spreadsheet([ImportedSpreadsheetSheet])
+
+    static func load(url: URL) throws -> ProcessedFileImport {
+        if OfficeImportService.isSpreadsheet(url) {
+            return .spreadsheet(try OfficeImportService.loadSpreadsheet(url: url))
+        }
+
+        return .text(try TextFileLoader.load(url: url))
+    }
 }
 
 enum SyntaxHighlightMode: String, CaseIterable, Codable {
@@ -1389,7 +1610,7 @@ extension String {
     }
 }
 
-struct LoadedTextFile {
+struct LoadedTextFile: Sendable {
     let text: String
     let textEncoding: TextEncoding
     let lineEnding: TextLineEnding
@@ -1528,7 +1749,7 @@ enum TextFileWriterError: LocalizedError {
     }
 }
 
-enum TextEncoding: String, CaseIterable, Codable {
+enum TextEncoding: String, CaseIterable, Codable, Sendable {
     case utf8
     case utf16
     case utf16LittleEndian
@@ -1573,7 +1794,7 @@ enum TextEncoding: String, CaseIterable, Codable {
     }
 }
 
-enum TextLineEnding: String, CaseIterable, Codable {
+enum TextLineEnding: String, CaseIterable, Codable, Sendable {
     case lf
     case crlf
     case cr

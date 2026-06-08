@@ -33,9 +33,24 @@ struct PreferencesView: View {
                 Toggle("Restore Previous Session", isOn: $preferences.restoreSession)
                 Toggle("Reuse Empty Tab When Opening Files", isOn: $preferences.reuseBlankTabWhenOpening)
             }
+
+            Section("Sharing & GitHub") {
+                Toggle("Enable Sharing Tools", isOn: $preferences.enableSharingTools)
+
+                Toggle("Enable GitHub Tools", isOn: $preferences.enableGitHubTools)
+                    .disabled(!preferences.enableSharingTools)
+
+                Toggle("Enable Publishing Actions", isOn: $preferences.enablePublishingActions)
+                    .disabled(!preferences.enableSharingTools || !preferences.enableGitHubTools)
+
+                Text("These tools stay hidden until enabled. Publishing uses the GitHub CLI if it is installed and signed in.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .padding(20)
-        .frame(width: 420)
+        .frame(width: 460)
     }
 }

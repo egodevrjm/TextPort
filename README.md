@@ -2,6 +2,15 @@
 
 TextPort is a small native macOS plain text editor that is growing into a lightweight IDE. Think Notepad, but Mac-native, project-aware, and less picky about text-file extensions.
 
+The default experience is intentionally simple: open a file, type, save, export when needed. Project, rendering, sharing, GitHub, and runnable-code tools appear only when they are useful or enabled in Settings.
+
+## Requirements
+
+- macOS 14 or newer
+- Swift 6 compatible toolchain for building from source
+
+## Highlights
+
 It can:
 
 - create and edit plain text
@@ -24,6 +33,9 @@ It can:
 - see Git status badges in project sidebars
 - run one-off project commands from the output panel
 - export open tabs as a zip bundle
+- optionally enable sharing tools for the current tab, selected text, rendered output, open-tab bundles, and project source bundles
+- optionally enable GitHub helpers for opening/copying repository links and file links from projects with GitHub remotes
+- optionally publish the current tab as a secret GitHub Gist through the GitHub CLI
 - open PDFs by extracting cleaned body text into a normal unsaved text tab
 - open Word `.docx` files by extracting cleaned body text into a normal unsaved text tab
 - open PowerPoint `.pptx` files by extracting slide text into a normal unsaved text tab
@@ -58,6 +70,22 @@ It can:
 - warn before replacing unsaved work
 - save and save as UTF-8 text
 
+## Optional Features
+
+TextPort includes several power tools that are designed to stay out of the way:
+
+- Project/IDE features appear when a folder or zip project is opened.
+- Sharing and GitHub helpers are disabled by default and can be enabled in Settings.
+- Render previews are contextual to supported formats such as Markdown, HTML, JSON, CSV, TSV, and SVG.
+- Run buttons appear for supported executable code files and project tasks.
+
+## Security And Privacy
+
+- TextPort works as a local macOS app and does not require an account.
+- Sharing and GitHub helpers are optional.
+- Project tasks and runnable code files execute local shell commands, so only run commands from projects you trust.
+- Imported PDFs, Office files, spreadsheets, zip projects, rendered previews, and JSON visualizations should be treated as untrusted input until inspected.
+
 ## Build
 
 ```sh
@@ -77,3 +105,15 @@ swift build
 ```
 
 That creates `TextPort.app` in this folder.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md).
+
+## License
+
+TextPort is open source under the [MIT License](LICENSE).

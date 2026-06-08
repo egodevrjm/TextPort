@@ -36,6 +36,33 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    @Published var customSyntaxDefinitions: [CustomSyntaxDefinition] {
+        didSet { save() }
+    }
+
+    @Published var enableSharingTools: Bool {
+        didSet {
+            if !enableSharingTools {
+                enableGitHubTools = false
+                enablePublishingActions = false
+            }
+            save()
+        }
+    }
+
+    @Published var enableGitHubTools: Bool {
+        didSet {
+            if !enableGitHubTools {
+                enablePublishingActions = false
+            }
+            save()
+        }
+    }
+
+    @Published var enablePublishingActions: Bool {
+        didSet { save() }
+    }
+
     private let defaults = UserDefaults.standard
     private let storageKey = "TextPortPreferences"
 
@@ -52,6 +79,10 @@ final class AppPreferences: ObservableObject {
             reuseBlankTabWhenOpening = stored.reuseBlankTabWhenOpening
             defaultEncoding = stored.defaultEncoding
             defaultLineEnding = stored.defaultLineEnding
+            customSyntaxDefinitions = stored.customSyntaxDefinitions ?? []
+            enableSharingTools = stored.enableSharingTools ?? false
+            enableGitHubTools = stored.enableGitHubTools ?? false
+            enablePublishingActions = stored.enablePublishingActions ?? false
         } else {
             fontSize = 14
             showLineNumbers = false
@@ -61,7 +92,44 @@ final class AppPreferences: ObservableObject {
             reuseBlankTabWhenOpening = true
             defaultEncoding = .utf8
             defaultLineEnding = .lf
+            customSyntaxDefinitions = []
+            enableSharingTools = false
+            enableGitHubTools = false
+            enablePublishingActions = false
         }
+    }
+
+    func customSyntaxDefinition(id: UUID?) -> CustomSyntaxDefinition? {
+        guard let id else { return nil }
+        return customSyntaxDefinitions.first { $0.id == id }
+    }
+
+    func matchingCustomSyntax(fileName: String, text: String) -> CustomSyntaxDefinition? {
+        customSyntaxDefinitions.first { $0.matches(fileName: fileName, text: text) }
+    }
+
+    func upsertCustomSyntax(_ definition: CustomSyntaxDefinition) {
+        let normalizedDefinition = CustomSyntaxDefinition(
+            id: definition.id,
+            name: definition.displayName,
+            fileExtensions: definition.fileExtensions,
+            keywords: definition.keywords,
+            singleLineComment: definition.singleLineComment,
+            blockCommentStart: definition.blockCommentStart,
+            blockCommentEnd: definition.blockCommentEnd,
+            stringDelimiters: definition.stringDelimiters,
+            caseSensitive: definition.caseSensitive
+        )
+
+        if let index = customSyntaxDefinitions.firstIndex(where: { $0.id == definition.id }) {
+            customSyntaxDefinitions[index] = normalizedDefinition
+        } else {
+            customSyntaxDefinitions.append(normalizedDefinition)
+        }
+    }
+
+    func removeCustomSyntax(id: UUID) {
+        customSyntaxDefinitions.removeAll { $0.id == id }
     }
 
     private func save() {
@@ -73,7 +141,11 @@ final class AppPreferences: ObservableObject {
             restoreSession: restoreSession,
             reuseBlankTabWhenOpening: reuseBlankTabWhenOpening,
             defaultEncoding: defaultEncoding,
-            defaultLineEnding: defaultLineEnding
+            defaultLineEnding: defaultLineEnding,
+            customSyntaxDefinitions: customSyntaxDefinitions,
+            enableSharingTools: enableSharingTools,
+            enableGitHubTools: enableGitHubTools,
+            enablePublishingActions: enablePublishingActions
         )
 
         guard let data = try? JSONEncoder().encode(stored) else { return }
@@ -90,4 +162,8 @@ private struct StoredPreferences: Codable {
     var reuseBlankTabWhenOpening: Bool
     var defaultEncoding: TextEncoding
     var defaultLineEnding: TextLineEnding
+    var customSyntaxDefinitions: [CustomSyntaxDefinition]?
+    var enableSharingTools: Bool?
+    var enableGitHubTools: Bool?
+    var enablePublishingActions: Bool?
 }
