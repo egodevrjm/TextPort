@@ -7,13 +7,14 @@ struct TextPortApp: App {
     @StateObject private var preferences = AppPreferences.shared
 
     var body: some Scene {
-        WindowGroup {
+        Window("TextPort", id: "main") {
             ContentView()
                 .environmentObject(document)
                 .environmentObject(project)
                 .environmentObject(preferences)
                 .frame(minWidth: 900, minHeight: 560)
         }
+        .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About TextPort") {
