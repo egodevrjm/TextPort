@@ -10,7 +10,7 @@ struct PlainTextEditorView: NSViewRepresentable {
     var wordWrap: Bool
     var syntaxMode: SyntaxHighlightMode
     var customSyntaxDefinition: CustomSyntaxDefinition?
-    var selectionChanged: (String) -> Void
+    var selectionChanged: (String, NSRange) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, selectionChanged: selectionChanged)
@@ -90,7 +90,7 @@ struct PlainTextEditorView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
-        var selectionChanged: (String) -> Void
+        var selectionChanged: (String, NSRange) -> Void
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
         private var lineNumberRuler: LineNumberRulerView?
@@ -98,7 +98,7 @@ struct PlainTextEditorView: NSViewRepresentable {
         private var currentSyntaxMode: SyntaxHighlightMode = .plainText
         private var currentCustomSyntaxDefinition: CustomSyntaxDefinition?
 
-        init(text: Binding<String>, selectionChanged: @escaping (String) -> Void) {
+        init(text: Binding<String>, selectionChanged: @escaping (String, NSRange) -> Void) {
             self.text = text
             self.selectionChanged = selectionChanged
         }
@@ -136,11 +136,11 @@ struct PlainTextEditorView: NSViewRepresentable {
             guard let textView else { return }
             let range = textView.selectedRange()
             guard range.location != NSNotFound, NSMaxRange(range) <= (textView.string as NSString).length else {
-                selectionChanged("")
+                selectionChanged("", NSRange(location: 0, length: 0))
                 return
             }
 
-            selectionChanged((textView.string as NSString).substring(with: range))
+            selectionChanged((textView.string as NSString).substring(with: range), range)
         }
 
         @objc

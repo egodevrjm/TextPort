@@ -131,6 +131,9 @@ struct ContentView: View {
         .sheet(isPresented: $document.showingDocumentStats) {
             DocumentStatsView(stats: document.activeDocumentStats)
         }
+        .sheet(isPresented: $document.showingFileInfo) {
+            FileInfoView(info: document.activeFileInfo)
+        }
         .sheet(isPresented: $document.showingJSONVisualizer) {
             JSONVisualStructureView(documentName: document.fileDisplayName, json: document.activeText)
         }
@@ -310,8 +313,8 @@ struct ContentView: View {
                     wordWrap: preferences.wordWrap,
                     syntaxMode: syntaxMode,
                     customSyntaxDefinition: customSyntax,
-                    selectionChanged: { selectedText in
-                        document.updateSelectedText(for: tab.id, selectedText: selectedText)
+                    selectionChanged: { selectedText, selectedRange in
+                        document.updateSelection(for: tab.id, selectedText: selectedText, range: selectedRange)
                     }
                 )
                 .background(Color(nsColor: .textBackgroundColor))
@@ -356,6 +359,20 @@ struct ContentView: View {
 
             Text(document.detailText)
                 .lineLimit(1)
+
+            Divider()
+                .frame(height: 12)
+
+            Text(document.cursorPositionText)
+                .lineLimit(1)
+
+            if let selectionSummary = document.selectionSummaryText {
+                Divider()
+                    .frame(height: 12)
+
+                Text(selectionSummary)
+                    .lineLimit(1)
+            }
 
             Spacer()
 

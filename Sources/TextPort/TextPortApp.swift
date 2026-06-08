@@ -242,6 +242,24 @@ struct TextPortApp: App {
                     document.closeActiveTab()
                 }
                 .keyboardShortcut("w", modifiers: .command)
+
+                Button("Reopen Closed Tab") {
+                    document.reopenClosedTab()
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(!document.canReopenClosedTab)
+
+                Divider()
+
+                Button("Close Other Tabs") {
+                    document.closeOtherTabs()
+                }
+                .disabled(document.tabs.count <= 1)
+
+                Button("Close Tabs to the Right") {
+                    document.closeTabsToRight()
+                }
+                .disabled(!document.canCloseTabsToRight)
             }
 
             CommandMenu("Project") {
@@ -477,6 +495,10 @@ struct TextPortApp: App {
             }
 
             CommandMenu("Tools") {
+                Button("File Info...") {
+                    document.showFileInfo()
+                }
+
                 Button("Document Stats") {
                     document.showDocumentStats()
                 }

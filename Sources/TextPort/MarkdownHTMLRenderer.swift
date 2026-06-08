@@ -54,8 +54,23 @@ enum MarkdownHTMLRenderer {
         pre {
             overflow: auto;
             padding: 13px 15px;
-            border-radius: 8px;
+            margin: 0;
+            border-radius: 0 0 8px 8px;
             background: color-mix(in srgb, CanvasText 9%, transparent);
+        }
+        figure.code-block {
+            margin: 1em 0;
+            border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+            border-radius: 8px;
+            overflow: hidden;
+            background: color-mix(in srgb, CanvasText 5%, transparent);
+        }
+        figcaption {
+            padding: 6px 12px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: color-mix(in srgb, CanvasText 68%, transparent);
+            border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
         }
         pre code {
             padding: 0;
@@ -64,6 +79,14 @@ enum MarkdownHTMLRenderer {
         }
         ul, ol { padding-left: 1.45em; }
         li { margin: 0.28em 0; }
+        li.task {
+            list-style: none;
+            margin-left: -1.35em;
+        }
+        li.task input {
+            margin-right: 0.45em;
+            vertical-align: -0.12em;
+        }
         table {
             border-collapse: collapse;
             width: 100%;
@@ -88,6 +111,13 @@ enum MarkdownHTMLRenderer {
             max-width: 100%;
             height: auto;
         }
+        .empty {
+            height: calc(100vh - 68px);
+            display: grid;
+            place-items: center;
+            color: color-mix(in srgb, CanvasText 45%, transparent);
+            font-size: 14px;
+        }
         </style>
         </head>
         <body>
@@ -104,6 +134,10 @@ private struct MarkdownBlockParser {
     let markdown: String
 
     func render() -> String {
+        guard !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "<div class=\"empty\">Nothing to preview yet.</div>"
+        }
+
         let lines = markdown
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
@@ -124,7 +158,15 @@ private struct MarkdownBlockParser {
             guard !listItems.isEmpty else { return }
             let tag = listItems.allSatisfy(\.ordered) ? "ol" : "ul"
             let items = listItems
-                .map { "<li>\(MarkdownInlineRenderer.render($0.text))</li>" }
+                .map { item -> String in
+                    let renderedText = MarkdownInlineRenderer.render(item.text)
+                    if let checked = item.checked {
+                        let checkedAttribute = checked ? " checked" : ""
+                        return "<li class=\"task\"><input type=\"checkbox\" disabled\(checkedAttribute)><span>\(renderedText)</span></li>"
+                    }
+
+                    return "<li>\(renderedText)</li>"
+                }
                 .joined(separator: "\n")
             blocks.append("<\(tag)>\n\(items)\n</\(tag)>")
             listItems.removeAll()
@@ -163,7 +205,8 @@ private struct MarkdownBlockParser {
                 }
 
                 let languageClass = language.isEmpty ? "" : " class=\"language-\(HTML.escapeAttribute(language))\""
-                blocks.append("<pre><code\(languageClass)>\(HTML.escape(codeLines.joined(separator: "\n")))</code></pre>")
+                let caption = language.isEmpty ? "" : "<figcaption>\(HTML.escape(language))</figcaption>"
+                blocks.append("<figure class=\"code-block\">\(caption)<pre><code\(languageClass)>\(HTML.escape(codeLines.joined(separator: "\n")))</code></pre></figure>")
                 continue
             }
 
@@ -228,6 +271,7 @@ private struct MarkdownBlockParser {
 private struct MarkdownListItem {
     let ordered: Bool
     let text: String
+    let checked: Bool?
 }
 
 private enum MarkdownPatterns {
@@ -251,7 +295,8 @@ private enum MarkdownPatterns {
 
     static func listItem(in line: String) -> MarkdownListItem? {
         if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("+ ") {
-            return MarkdownListItem(ordered: false, text: String(line.dropFirst(2)))
+            let item = taskListItem(from: String(line.dropFirst(2)))
+            return MarkdownListItem(ordered: false, text: item.text, checked: item.checked)
         }
 
         guard let dotIndex = line.firstIndex(of: ".") else { return nil }
@@ -265,7 +310,23 @@ private enum MarkdownPatterns {
             return nil
         }
 
-        return MarkdownListItem(ordered: true, text: String(line[line.index(after: textStart)...]))
+        let item = taskListItem(from: String(line[line.index(after: textStart)...]))
+        return MarkdownListItem(ordered: true, text: item.text, checked: item.checked)
+    }
+
+    private static func taskListItem(from text: String) -> (text: String, checked: Bool?) {
+        guard text.count >= 4 else { return (text, nil) }
+        let prefix = text.prefix(4).lowercased()
+
+        if prefix == "[ ] " {
+            return (String(text.dropFirst(4)), false)
+        }
+
+        if prefix == "[x] " {
+            return (String(text.dropFirst(4)), true)
+        }
+
+        return (text, nil)
     }
 
     static func table(startingAt index: Int, lines: [String]) -> (html: String, nextIndex: Int)? {

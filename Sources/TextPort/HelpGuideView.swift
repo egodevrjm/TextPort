@@ -148,8 +148,10 @@ private struct HelpGuideDetail: View {
                     items: [
                         "Open or drag in files to edit them as text.",
                         "Tabs keep multiple files available without changing the main editor layout.",
+                        "Use the Tabs menu to reopen the last closed tab, close other tabs, or close tabs to the right.",
                         "Click the title-bar name to rename a saved file or set the suggested name for an unsaved tab.",
-                        "Use automatic syntax highlighting by default, or choose a syntax mode from the Text menu."
+                        "Use automatic syntax highlighting by default, or choose a syntax mode from the Text menu.",
+                        "The status bar shows cursor line and column, plus selected text counts when text is selected."
                     ]
                 )
 
@@ -157,7 +159,16 @@ private struct HelpGuideDetail: View {
                     "Preview",
                     items: [
                         "HTML, Markdown, JSON, CSV, TSV, and SVG files can switch between source and rendered preview.",
+                        "Markdown preview supports headings, tables, task lists, code blocks, links, images, quotes, and inline formatting.",
                         "The smart toolbar shows preview, JSON visualization, and run actions only when they apply."
+                    ]
+                )
+
+                helpSection(
+                    "File Info",
+                    items: [
+                        "Open File Info from the Tools menu or Command Palette.",
+                        "File Info shows save state, path, disk size, modified date, encoding, line endings, and syntax mode."
                     ]
                 )
 

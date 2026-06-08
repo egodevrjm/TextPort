@@ -21,6 +21,7 @@ final class TextDocumentStore: ObservableObject {
     @Published var splitViewEnabled = false
     @Published var secondaryTabID: UUID?
     @Published var showingDocumentStats = false
+    @Published var showingFileInfo = false
     @Published var showingJSONVisualizer = false
     @Published var showingCommandPalette = false
     @Published var showingTabCompare = false
@@ -36,7 +37,9 @@ final class TextDocumentStore: ObservableObject {
     private var sessionSaveTask: Task<Void, Never>?
     private var fileChangeTimer: Timer?
     private var selectedTextByTabID: [UUID: String] = [:]
+    private var selectionRangeByTabID: [UUID: NSRange] = [:]
     private var queuedProcessedFileURLs: [URL] = []
+    private var recentlyClosedTabs: [TextDocumentTab] = []
 
     init() {
         recentFiles = RecentFileStore.load()
@@ -107,8 +110,30 @@ final class TextDocumentStore: ObservableObject {
         "\(activeTab.text.count) characters"
     }
 
+    var cursorPositionText: String {
+        let position = cursorPosition(for: selectedTabID)
+        return "Ln \(position.line), Col \(position.column)"
+    }
+
+    var selectionSummaryText: String? {
+        let selectedText = selectedTextByTabID[selectedTabID] ?? ""
+        guard !selectedText.isEmpty else { return nil }
+
+        let lines = TextMetrics.lineCount(in: selectedText)
+        let words = TextMetrics.wordCount(in: selectedText)
+        let characters = selectedText.count
+        let lineLabel = lines == 1 ? "1 line" : "\(lines) lines"
+        let wordLabel = words == 1 ? "1 word" : "\(words) words"
+        let characterLabel = characters == 1 ? "1 character" : "\(characters) characters"
+        return "Selected \(lineLabel), \(wordLabel), \(characterLabel)"
+    }
+
     var activeDocumentStats: DocumentStats {
         stats(for: selectedTabID)
+    }
+
+    var activeFileInfo: DocumentFileInfo {
+        DocumentFileInfo(tab: activeTab, syntaxLabel: activeSyntaxLabel)
     }
 
     var activeDocumentCanVisualizeJSON: Bool {
@@ -122,6 +147,14 @@ final class TextDocumentStore: ObservableObject {
     var activeFileRunCommand: RunFileCommand? {
         guard let fileURL = activeTab.fileURL else { return nil }
         return RunFileCommand.make(for: fileURL)
+    }
+
+    var canReopenClosedTab: Bool {
+        !recentlyClosedTabs.isEmpty
+    }
+
+    var canCloseTabsToRight: Bool {
+        activeTabIndex < tabs.count - 1
     }
 
     var filteredQuickOpenItems: [QuickOpenItem] {
@@ -175,8 +208,10 @@ final class TextDocumentStore: ObservableObject {
         statusText = "Edited"
     }
 
-    func updateSelectedText(for id: UUID, selectedText: String) {
+    func updateSelection(for id: UUID, selectedText: String, range: NSRange) {
+        objectWillChange.send()
         selectedTextByTabID[id] = selectedText
+        selectionRangeByTabID[id] = range
     }
 
     func effectiveSyntaxMode(for id: UUID) -> SyntaxHighlightMode {
@@ -321,13 +356,42 @@ final class TextDocumentStore: ObservableObject {
         closeTab(selectedTabID)
     }
 
+    func closeOtherTabs() {
+        let keepingTabID = selectedTabID
+        let idsToClose = tabs
+            .filter { $0.id != keepingTabID }
+            .map(\.id)
+        closeTabs(idsToClose)
+
+        if tabs.contains(where: { $0.id == keepingTabID }) {
+            selectedTabID = keepingTabID
+        }
+    }
+
+    func closeTabsToRight() {
+        let selectedIndex = activeTabIndex
+        guard selectedIndex + 1 < tabs.count else { return }
+        let idsToClose = tabs[(selectedIndex + 1)...].map(\.id)
+        closeTabs(idsToClose)
+    }
+
+    func reopenClosedTab() {
+        guard let tab = recentlyClosedTabs.popLast() else { return }
+        tabs.append(tab)
+        selectedTabID = tab.id
+        statusText = "Reopened \(tab.fileDisplayName)"
+        scheduleSessionSave()
+    }
+
     func closeTab(_ id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         guard confirmCloseTab(at: index) else { return }
 
+        let closedTab = tabs[index]
         let closingSelectedTab = selectedTabID == id
         let closingSecondaryTab = secondaryTabID == id
         tabs.remove(at: index)
+        rememberClosedTab(closedTab)
 
         if tabs.isEmpty {
             let replacementTab = makeBlankTab()
@@ -350,6 +414,20 @@ final class TextDocumentStore: ObservableObject {
 
         statusText = "Closed tab"
         scheduleSessionSave()
+    }
+
+    private func closeTabs(_ ids: [UUID]) {
+        for id in ids {
+            guard tabs.contains(where: { $0.id == id }) else { continue }
+            closeTab(id)
+        }
+    }
+
+    private func rememberClosedTab(_ tab: TextDocumentTab) {
+        recentlyClosedTabs.append(tab)
+        recentlyClosedTabs = Array(recentlyClosedTabs.suffix(10))
+        selectedTextByTabID.removeValue(forKey: tab.id)
+        selectionRangeByTabID.removeValue(forKey: tab.id)
     }
 
     func openDocument() {
@@ -548,6 +626,10 @@ final class TextDocumentStore: ObservableObject {
 
     func showDocumentStats() {
         showingDocumentStats = true
+    }
+
+    func showFileInfo() {
+        showingFileInfo = true
     }
 
     func showDocumentOutline() {
@@ -1185,6 +1267,22 @@ final class TextDocumentStore: ObservableObject {
         return DocumentStats(tab: tab, selectedText: selectedText)
     }
 
+    private func cursorPosition(for id: UUID) -> DocumentCursorPosition {
+        let tab = tabs.first(where: { $0.id == id }) ?? activeTab
+        let nsText = tab.text as NSString
+        let rawLocation = selectionRangeByTabID[id]?.location ?? 0
+        let location = max(0, min(rawLocation, nsText.length))
+        let prefix = nsText.substring(to: location)
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = prefix.components(separatedBy: "\n")
+        let currentLine = lines.last ?? ""
+        return DocumentCursorPosition(
+            line: max(1, lines.count),
+            column: (currentLine as NSString).length + 1
+        )
+    }
+
     private func scheduleSessionSave() {
         sessionSaveTask?.cancel()
         let tabsSnapshot = tabs
@@ -1418,6 +1516,54 @@ struct DocumentStats {
         selectedCharacters = selectedText.count
         selectedBytes = selectedText.data(using: tab.textEncoding.stringEncoding)?.count ?? selectedText.utf8.count
     }
+}
+
+struct DocumentFileInfo {
+    let fileName: String
+    let path: String?
+    let folder: String?
+    let fileSize: Int?
+    let modifiedDate: Date?
+    let encoding: String
+    let lineEnding: String
+    let syntax: String
+    let stateLabel: String
+    let saveBehavior: String
+
+    init(tab: TextDocumentTab, syntaxLabel: String) {
+        fileName = tab.fileDisplayName
+        path = tab.fileURL?.standardizedFileURL.path
+        folder = tab.fileURL?.deletingLastPathComponent().standardizedFileURL.path
+        encoding = tab.textEncoding.label
+        lineEnding = tab.preferredLineEnding.label
+        syntax = syntaxLabel
+
+        if let fileURL = tab.fileURL,
+           let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+        {
+            fileSize = attributes[.size] as? Int
+            modifiedDate = attributes[.modificationDate] as? Date
+        } else {
+            fileSize = nil
+            modifiedDate = nil
+        }
+
+        if tab.fileURL == nil {
+            stateLabel = tab.isEdited ? "Unsaved editable copy" : "Unsaved draft"
+            saveBehavior = "Save will ask where to create the source file."
+        } else if tab.isEdited {
+            stateLabel = "Saved file with unsaved changes"
+            saveBehavior = "Save will write changes back to the file path."
+        } else {
+            stateLabel = "Saved file"
+            saveBehavior = "Save writes back to the file path when changes are made."
+        }
+    }
+}
+
+struct DocumentCursorPosition: Equatable {
+    let line: Int
+    let column: Int
 }
 
 struct QuickOpenItem: Identifiable, Equatable {

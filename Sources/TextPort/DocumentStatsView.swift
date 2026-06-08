@@ -29,6 +29,55 @@ struct DocumentStatsView: View {
     }
 }
 
+struct FileInfoView: View {
+    let info: DocumentFileInfo
+
+    var body: some View {
+        Form {
+            Section(info.fileName) {
+                InfoRow(label: "State", value: info.stateLabel)
+                InfoRow(label: "Save Behavior", value: info.saveBehavior)
+
+                if let path = info.path {
+                    InfoRow(label: "Path", value: path)
+                }
+
+                if let folder = info.folder {
+                    InfoRow(label: "Folder", value: folder)
+                }
+            }
+
+            Section("File") {
+                if let fileSize = info.fileSize {
+                    InfoRow(label: "Size on Disk", value: ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file))
+                } else {
+                    InfoRow(label: "Size on Disk", value: "Not saved")
+                }
+
+                if let modifiedDate = info.modifiedDate {
+                    InfoRow(label: "Modified", value: Self.dateFormatter.string(from: modifiedDate))
+                }
+            }
+
+            Section("Text") {
+                InfoRow(label: "Encoding", value: info.encoding)
+                InfoRow(label: "Line Endings", value: info.lineEnding)
+                InfoRow(label: "Syntax", value: info.syntax)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(20)
+        .frame(width: 520)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
 private struct StatRow: View {
     let label: String
     let value: String
@@ -39,6 +88,22 @@ private struct StatRow: View {
             Spacer()
             Text(value)
                 .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+}
+
+private struct InfoRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer(minLength: 20)
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
         }
     }
