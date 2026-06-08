@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a calmer default start surface and clearer tabbed Settings layout.
 - Added project-based IDE foundations while keeping standalone text editing as the default experience.
 - Added optional sharing and GitHub helper tools.
 - Added import support for PDFs, Word documents, PowerPoint decks, and Excel workbooks.

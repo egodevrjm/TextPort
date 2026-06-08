@@ -239,6 +239,14 @@ struct ContentView: View {
                 editorPane(for: document.activeTab)
             }
 
+            if shouldShowStartSurface {
+                StartSurface(
+                    openFile: { document.openDocument() },
+                    openProject: { openProjectPanel() },
+                    openScratchpad: { document.openScratchpad() }
+                )
+            }
+
             RoundedRectangle(cornerRadius: 0)
                 .stroke(Color.accentColor, lineWidth: isDroppingFile ? 3 : 0)
                 .allowsHitTesting(false)
@@ -370,8 +378,53 @@ struct ContentView: View {
         document.activeFileRunCommand
     }
 
+    private var shouldShowStartSurface: Bool {
+        let tab = document.activeTab
+        return !project.hasProject &&
+            !document.splitViewEnabled &&
+            document.tabs.count == 1 &&
+            tab.fileURL == nil &&
+            tab.text.isEmpty &&
+            !tab.isEdited &&
+            tab.displayName == "Untitled"
+    }
+
     private func runActiveFile() {
         document.runActiveFile(using: project)
+    }
+}
+
+private struct StartSurface: View {
+    let openFile: () -> Void
+    let openProject: () -> Void
+    let openScratchpad: () -> Void
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 44, weight: .light))
+                .foregroundStyle(.tertiary)
+
+            Text("TextPort")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button(action: openFile) {
+                    Label("Open File", systemImage: "doc.badge.plus")
+                }
+
+                Button(action: openProject) {
+                    Label("Open Project", systemImage: "folder.badge.plus")
+                }
+
+                Button(action: openScratchpad) {
+                    Label("Scratchpad", systemImage: "note.text")
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(28)
     }
 }
 

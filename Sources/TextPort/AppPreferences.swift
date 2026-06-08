@@ -132,6 +132,20 @@ final class AppPreferences: ObservableObject {
         customSyntaxDefinitions.removeAll { $0.id == id }
     }
 
+    func resetToSimpleDefaults() {
+        fontSize = 14
+        showLineNumbers = false
+        wordWrap = true
+        renderPreview = false
+        restoreSession = true
+        reuseBlankTabWhenOpening = true
+        defaultEncoding = .utf8
+        defaultLineEnding = .lf
+        enableSharingTools = false
+        enableGitHubTools = false
+        enablePublishingActions = false
+    }
+
     private func save() {
         let stored = StoredPreferences(
             fontSize: fontSize,
